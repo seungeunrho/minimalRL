@@ -1,12 +1,10 @@
-
 #REINFORCE 
 import gym
-import torch.optim as optim
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.optim as optim
 from torch.distributions import Categorical
-
 
 class Policy(nn.Module):
     def __init__(self):
@@ -14,15 +12,13 @@ class Policy(nn.Module):
         self.data = []
         self.gamma = 0.99
         
-        self.fc1 = nn.Linear(4, 64)
-        self.fc2 = nn.Linear(64, 64)
-        self.fc3 = nn.Linear(64, 2)
-        self.optimizer = optim.Adam(self.parameters(), lr=0.0002)
+        self.fc1 = nn.Linear(4, 128)
+        self.fc2 = nn.Linear(128, 2)
+        self.optimizer = optim.Adam(self.parameters(), lr=0.0005)
         
     def forward(self, x):
         x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = F.softmax(self.fc3(x), dim=0)
+        x = F.softmax(self.fc2(x), dim=0)
         return x
       
     def put_data(self, item):
@@ -31,20 +27,19 @@ class Policy(nn.Module):
     def train(self):
         R = 0
         for r, log_prob in self.data[::-1]:
-            R = r + R*self.gamma
+            R = r + R * self.gamma
             loss = -log_prob * R
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
         self.data = []
 
-
 def main():
-    env = gym.make('CartPole-v0')
+    env = gym.make('CartPole-v1')
     pi = Policy()
     avg_t = 0
     
-    for n_epi in range(1000):
+    for n_epi in range(10000):
         obs = env.reset()
         for t in range(600):
             obs = torch.tensor(obs, dtype=torch.float)
