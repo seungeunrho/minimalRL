@@ -1,4 +1,4 @@
-#Vanilla Actor-Critic
+#Vanilla TD Actor-Critic
 import gym
 import torch
 import torch.nn as nn
@@ -29,7 +29,7 @@ class ActorCritic(nn.Module):
     def train(self):
         loss = torch.cat(self.loss_lst).sum()
         self.optimizer.zero_grad()
-        loss.backward(retain_graph=True)
+        loss.backward()
         self.optimizer.step()
         self.loss_lst = []
         
