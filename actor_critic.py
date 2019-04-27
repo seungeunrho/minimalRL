@@ -28,6 +28,7 @@ class ActorCritic(nn.Module):
     
     def train(self):
         loss = torch.cat(self.loss_lst).sum()
+        loss = loss/len(self.loss_lst)
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
