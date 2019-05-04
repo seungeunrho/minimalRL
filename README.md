@@ -16,7 +16,7 @@ PyTorch based.
 
 ## Usage
 ```bash
-# Works only wih Python 3.
+# Works only with Python 3.
 python3 REINFORCE.py
 python3 actor_critic.py
 ```
