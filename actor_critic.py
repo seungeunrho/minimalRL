@@ -14,7 +14,7 @@ class ActorCritic(nn.Module):
         self.fc1 = nn.Linear(4, 128)
         self.fc_pi = nn.Linear(128, 2)
         self.fc_v = nn.Linear(128, 1)
-        self.optimizer = optim.Adam(self.parameters(), lr=0.002)
+        self.optimizer = optim.Adam(self.parameters(), lr=0.005)
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
@@ -53,7 +53,7 @@ def main():
             obs, r, done, info = env.step(action.item())
             _, next_v = model(torch.from_numpy(obs).float())
             delta = r + gamma * next_v - v
-            loss = -torch.log(pi[action]) * delta.item() + delta * delta
+            loss = -torch.log(pi[action]) * delta.item() + delta * delta.item()
             model.gather_loss(loss)
 
             if done:
