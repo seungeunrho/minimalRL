@@ -9,6 +9,7 @@ PyTorch based.
 
 2019-04-27 : TD Actor-Critic added (72 lines)
 
+2019-05-06 : DQN added (99 lines)
 
 ## Dependencies
 1. PyTorch
@@ -17,6 +18,8 @@ PyTorch based.
 ## Usage
 ```bash
 # Works only with Python 3.
+# e.g.
 python3 REINFORCE.py
 python3 actor_critic.py
+
 ```
