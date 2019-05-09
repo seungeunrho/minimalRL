@@ -40,20 +40,21 @@ class Qnet(nn.Module):
         x = self.fc3(x)
         return x
       
-    def sample_action(self, q_val, epsilon):
+    def sample_action(self, obs, epsilon):
+        out = self.forward(obs)
         coin = random.random()
         if coin < epsilon:
             return random.randint(0,1)
         else : 
-            return q_val.argmax().item()
+            return out.argmax().item()
             
 def train(q, q_target, memory, gamma, optimizer, batch_size):
     for i in range(10):
-        sample = memory.sample(batch_size)
+        batch = memory.sample(batch_size)
         s_lst, a_lst, r_lst, s_prime_lst, done_mask_lst = [], [], [], [], []
         
-        for item in sample:
-            s, a, r, s_prime, done_mask = item
+        for transition in batch:
+            s, a, r, s_prime, done_mask = transition
             s_lst.append(s)
             a_lst.append([a])
             r_lst.append(r)
@@ -85,11 +86,10 @@ def main():
     optimizer = optim.Adam(q.parameters(), lr=0.0005)
 
     for n_epi in range(10000):
-        epsilon = max(0.01, 0.1 - 0.01*(n_epi/200)) #Linear annealing
+        epsilon = max(0.01, 0.08 - 0.01*(n_epi/200)) #Linear annealing from 8% to 1%
         s = env.reset()
         for t in range(600):
-            out = q(s)
-            a = q.sample_action(out, epsilon)      
+            a = q.sample_action(s, epsilon)      
             s_prime, r, done, info = env.step(a)
             done_mask = 0.0 if done else 1.0
             memory.put((s,a,r/200.0,s_prime, done_mask))
