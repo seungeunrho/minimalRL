@@ -1,6 +1,7 @@
 import gym
 import collections
 import random
+import numpy as np
 
 import torch
 import torch.nn as nn
@@ -8,11 +9,11 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.distributions import Categorical
 
-
 class ReplayBuffer():
     def __init__(self):
         self.buffer = collections.deque()
-        self.size_limit = 10000
+        self.batch_size = 32
+        self.size_limit = 50000
     
     def put(self, data):
         self.buffer.append(data)
@@ -24,18 +25,13 @@ class ReplayBuffer():
     
     def size(self):
         return len(self.buffer)
-        
 
 class Qnet(nn.Module):
     def __init__(self):
         super(Qnet, self).__init__()
-        self.batch_size = 16
-        self.gamma = 0.99
-        
         self.fc1 = nn.Linear(4, 64)
-        self.fc2 = nn.Linear(64, 32)
-        self.fc3 = nn.Linear(32, 2)
-        self.optimizer = optim.Adam(self.parameters(), lr=0.0002)
+        self.fc2 = nn.Linear(64, 64)
+        self.fc3 = nn.Linear(64, 2)
 
     def forward(self, x):
         x = torch.from_numpy(x).float()
@@ -43,55 +39,71 @@ class Qnet(nn.Module):
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
         return x
-    
-    def train(self, buffer):
-        if buffer.size()>1000:
-            for i in range(4):
-                loss_lst = []
-                sample = buffer.sample(self.batch_size)
-                for item in sample:
-                    s, a, r, s_prime, done = item
-                    q = self.forward(s)
-                    if done :
-                        loss = F.smooth_l1_loss(0, q[a])
-                    else:
-                        target = r + self.gamma* self.forward(s_prime).max()
-                        loss = F.smooth_l1_loss(target.item(), q[a])
-                    loss_lst.append(loss.unsqueeze(0))
-                loss = torch.cat(loss_lst).sum()
-                loss = loss/len(loss_lst)
-                self.optimizer.zero_grad()
-                loss.backward()
-                self.optimizer.step()
+      
+    def sample_action(self, q_val, epsilon):
+        coin = random.random()
+        if coin < epsilon:
+            return random.randint(0,1)
+        else : 
+            return q_val.argmax().item()
+            
+def train(q, q_target, memory, gamma, optimizer, batch_size):
+    for i in range(10):
+        sample = memory.sample(batch_size)
+        s_lst, a_lst, r_lst, s_prime_lst, done_mask_lst = [], [], [], [], []
+        
+        for item in sample:
+            s, a, r, s_prime, done_mask = item
+            s_lst.append(s)
+            a_lst.append([a])
+            r_lst.append(r)
+            s_prime_lst.append(s_prime)
+            done_mask_lst.append([done_mask])
+
+        s,a,r,s_prime,done_mask = np.array(s_lst), torch.tensor(a_lst), torch.tensor(r_lst), np.array(s_prime_lst), torch.tensor(done_mask_lst)
+        q_out = q(s)
+        q_a = q_out.gather(1,a)
+        q_prime = q_target(s_prime).max(1)[0].unsqueeze(1)
+        target = r + gamma * q_prime * done_mask
+        loss = F.smooth_l1_loss(target, q_a)
+        
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
 
 def main():
     env = gym.make('CartPole-v1')
     q = Qnet()
-    avg_t = 0
+    q_target = Qnet()
+    q_target.load_state_dict(q.state_dict())
+    q_target.eval()
     memory = ReplayBuffer()
+
+    avg_t = 0
+    gamma = 0.98
+    batch_size = 32
+    optimizer = optim.Adam(q.parameters(), lr=0.0005)
 
     for n_epi in range(10000):
         epsilon = max(0.01, 0.1 - 0.01*(n_epi/200)) #Linear annealing
         s = env.reset()
         for t in range(600):
             out = q(s)
-            coin = random.random()
-            if coin < epsilon:
-                a = random.randint(0,1)
-            else : 
-                a = out.argmax().item()
+            a = q.sample_action(out, epsilon)      
             s_prime, r, done, info = env.step(a)
-            memory.put((s,a,r/200.0,s_prime, done))
+            done_mask = 0.0 if done else 1.0
+            memory.put((s,a,r/200.0,s_prime, done_mask))
             s = s_prime
-            
             if done:
                 break
-                
-        avg_t += t
-        q.train(memory)
 
-        if n_epi%50==0 and n_epi!=0:
-            print("# of episode :{}, Avg timestep : {}, buffer size : {}, epsilon : {:.1f}%".format(n_epi, avg_t/50.0, memory.size(), epsilon*100))
+        avg_t += t
+        if memory.size()>2000:
+            train(q, q_target, memory, gamma, optimizer, batch_size)
+
+        if n_epi%20==0 and n_epi!=0:
+            q_target.load_state_dict(q.state_dict())
+            print("# of episode :{}, Avg timestep : {:.1f}, buffer size : {}, epsilon : {:.1f}%".format(n_epi, avg_t/20.0, memory.size(), epsilon*100))
             avg_t = 0
     env.close()
 
