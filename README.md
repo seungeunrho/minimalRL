@@ -9,7 +9,7 @@ PyTorch based.
 
 2019-04-27 : TD Actor-Critic added (72 lines)
 
-2019-05-06 : DQN added (99 lines)
+2019-05-06 : DQN (including replay memory and target network) added (111 lines)
 
 ## Dependencies
 1. PyTorch
