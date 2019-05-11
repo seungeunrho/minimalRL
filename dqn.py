@@ -63,8 +63,8 @@ def train(q, q_target, memory, gamma, optimizer, batch_size):
                                   torch.tensor(done_mask_lst)
         q_out = q(s)
         q_a = q_out.gather(1,a)
-        q_prime = q_target(s_prime).max(1)[0].unsqueeze(1)
-        target = r + gamma * q_prime * done_mask
+        max_q_prime = q_target(s_prime).max(1)[0].unsqueeze(1)
+        target = r + gamma * max_q_prime * done_mask
         loss = F.smooth_l1_loss(target, q_a)
         
         optimizer.zero_grad()
@@ -97,7 +97,7 @@ def main():
             if done:
                 break
         avg_t += t
-        
+
         if memory.size()>2000:
             train(q, q_target, memory, gamma, optimizer, batch_size)
 
