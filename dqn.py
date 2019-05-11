@@ -58,7 +58,9 @@ def train(q, q_target, memory, gamma, optimizer, batch_size):
             s_prime_lst.append(s_prime)
             done_mask_lst.append([done_mask])
 
-        s,a,r,s_prime,done_mask = torch.tensor(s_lst, dtype=torch.float), torch.tensor(a_lst), torch.tensor(r_lst), torch.tensor(s_prime_lst, dtype=torch.float), torch.tensor(done_mask_lst)
+        s,a,r,s_prime,done_mask = torch.tensor(s_lst, dtype=torch.float), torch.tensor(a_lst), \
+                                  torch.tensor(r_lst), torch.tensor(s_prime_lst, dtype=torch.float), \
+                                  torch.tensor(done_mask_lst)
         q_out = q(s)
         q_a = q_out.gather(1,a)
         q_prime = q_target(s_prime).max(1)[0].unsqueeze(1)
@@ -74,7 +76,6 @@ def main():
     q = Qnet()
     q_target = Qnet()
     q_target.load_state_dict(q.state_dict())
-    q_target.eval()
     memory = ReplayBuffer()
 
     avg_t = 0
@@ -85,22 +86,25 @@ def main():
     for n_epi in range(10000):
         epsilon = max(0.01, 0.08 - 0.01*(n_epi/200)) #Linear annealing from 8% to 1%
         s = env.reset()
+
         for t in range(600):
             a = q.sample_action(torch.from_numpy(s).float(), epsilon)      
             s_prime, r, done, info = env.step(a)
             done_mask = 0.0 if done else 1.0
             memory.put((s,a,r/200.0,s_prime, done_mask))
             s = s_prime
+
             if done:
                 break
-
         avg_t += t
+        
         if memory.size()>2000:
             train(q, q_target, memory, gamma, optimizer, batch_size)
 
         if n_epi%20==0 and n_epi!=0:
             q_target.load_state_dict(q.state_dict())
-            print("# of episode :{}, Avg timestep : {:.1f}, buffer size : {}, epsilon : {:.1f}%".format(n_epi, avg_t/20.0, memory.size(), epsilon*100))
+            print("# of episode :{}, Avg timestep : {:.1f}, buffer size : {}, epsilon : {:.1f}%".format(
+                                                            n_epi, avg_t/20.0, memory.size(), epsilon*100))
             avg_t = 0
     env.close()
 
