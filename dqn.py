@@ -33,7 +33,6 @@ class Qnet(nn.Module):
         self.fc3 = nn.Linear(64, 2)
 
     def forward(self, x):
-        x = torch.from_numpy(x).float()
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
@@ -56,11 +55,11 @@ def train(q, q_target, memory, gamma, optimizer, batch_size):
             s, a, r, s_prime, done_mask = transition
             s_lst.append(s)
             a_lst.append([a])
-            r_lst.append(r)
+            r_lst.append([r])
             s_prime_lst.append(s_prime)
             done_mask_lst.append([done_mask])
 
-        s,a,r,s_prime,done_mask = np.array(s_lst), torch.tensor(a_lst), torch.tensor(r_lst), np.array(s_prime_lst), torch.tensor(done_mask_lst)
+        s,a,r,s_prime,done_mask = torch.tensor(s_lst, dtype=torch.float), torch.tensor(a_lst), torch.tensor(r_lst), torch.tensor(s_prime_lst, dtype=torch.float), torch.tensor(done_mask_lst)
         q_out = q(s)
         q_a = q_out.gather(1,a)
         q_prime = q_target(s_prime).max(1)[0].unsqueeze(1)
@@ -88,7 +87,7 @@ def main():
         epsilon = max(0.01, 0.08 - 0.01*(n_epi/200)) #Linear annealing from 8% to 1%
         s = env.reset()
         for t in range(600):
-            a = q.sample_action(s, epsilon)      
+            a = q.sample_action(torch.from_numpy(s).float(), epsilon)      
             s_prime, r, done, info = env.step(a)
             done_mask = 0.0 if done else 1.0
             memory.put((s,a,r/200.0,s_prime, done_mask))
