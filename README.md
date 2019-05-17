@@ -1,10 +1,8 @@
 # minimalRL-pytorch
 
-Learn and practice basic RL algorithms with minimal lines of codes! (PyTorch based)
+Implementations of basic RL algorithms with minimal lines of codes! (PyTorch based)
 
-Every environment is fixed to "CartPole-v1" from OpenAI GYM.
-
-You can just focus on the implementations of various algorithms.
+Every environment is fixed to "CartPole-v1" from OpenAI GYM. You can just focus on the implementations.
 
 
 
