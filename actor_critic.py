@@ -40,7 +40,9 @@ def main():
     model = ActorCritic()
     gamma = 0.99
 
-    avg_t = 0
+    score = 0.0
+    print_interval = 30
+
     for n_epi in range(10000):
         obs = env.reset()
         loss_lst = []
@@ -56,15 +58,15 @@ def main():
             loss = -torch.log(pi[action]) * delta.item() + delta * delta.item()
             model.gather_loss(loss)
 
+            score += r
             if done:
                 break
         
         model.train()
-        avg_t += t
         
-        if n_epi%30==0 and n_epi!=0:
-            print("# of episode :{}, Avg timestep : {:.1f}".format(n_epi, avg_t/30.0))
-            avg_t = 0
+        if n_epi%print_interval==0 and n_epi!=0:
+            print("# of episode :{}, avg score : {:.1f}".format(n_epi, score/print_interval))
+            score = 0.0
 
     env.close()
 

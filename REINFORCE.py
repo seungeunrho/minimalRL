@@ -37,7 +37,8 @@ class Policy(nn.Module):
 def main():
     env = gym.make('CartPole-v1')
     pi = Policy()
-    avg_t = 0
+    score = 0.0
+    print_interval = 20
     
     for n_epi in range(10000):
         obs = env.reset()
@@ -48,13 +49,15 @@ def main():
             action = m.sample()
             obs, r, done, info = env.step(action.item())
             pi.put_data((r,torch.log(out[action])))
+            
+            score += r
             if done:
                 break
-        avg_t += t
+
         pi.train()
-        if n_epi%20==0 and n_epi!=0:
-            print("# of episode :{}, Avg timestep : {}".format(n_epi, avg_t/20.0))
-            avg_t = 0
+        if n_epi%print_interval==0 and n_epi!=0:
+            print("# of episode :{}, avg score : {}".format(n_epi, score/print_interval))
+            score = 0.0
     env.close()
     
 if __name__ == '__main__':

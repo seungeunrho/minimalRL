@@ -10,7 +10,6 @@ import torch.optim as optim
 class ReplayBuffer():
     def __init__(self):
         self.buffer = collections.deque()
-        self.batch_size = 32
         self.size_limit = 50000
     
     def put(self, data):
@@ -78,7 +77,8 @@ def main():
     q_target.load_state_dict(q.state_dict())
     memory = ReplayBuffer()
 
-    avg_t = 0
+    print_interval = 20
+    score = 0.0
     gamma = 0.98
     batch_size = 32
     optimizer = optim.Adam(q.parameters(), lr=0.0005)
@@ -94,18 +94,19 @@ def main():
             memory.put((s,a,r/200.0,s_prime, done_mask))
             s = s_prime
 
+            score += r
             if done:
                 break
-        avg_t += t
+            
 
         if memory.size()>2000:
             train(q, q_target, memory, gamma, optimizer, batch_size)
 
-        if n_epi%20==0 and n_epi!=0:
+        if n_epi%print_interval==0 and n_epi!=0:
             q_target.load_state_dict(q.state_dict())
-            print("# of episode :{}, Avg timestep : {:.1f}, buffer size : {}, epsilon : {:.1f}%".format(
-                                                            n_epi, avg_t/20.0, memory.size(), epsilon*100))
-            avg_t = 0
+            print("# of episode :{}, avg score : {:.1f}, buffer size : {}, epsilon : {:.1f}%".format(
+                                                            n_epi, score/print_interval, memory.size(), epsilon*100))
+            score = 0.0
     env.close()
 
 if __name__ == '__main__':
