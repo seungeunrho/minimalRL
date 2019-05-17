@@ -78,7 +78,6 @@ class PPO(nn.Module):
         loss.mean().backward()
         self.optimizer.step()
         
-
 def main():
     env = gym.make('CartPole-v1')
     model = PPO()
