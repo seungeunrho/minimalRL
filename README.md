@@ -1,15 +1,17 @@
-# minimalRL
+# minimalRL-pytorch
 
 Learn and practice basic RL algorithms with minimal lines of codes!
 
 PyTorch based.
 
 
-2019-04-23 : REINFORCE added (61 lines)
+2019-04-23 : REINFORCE added (64 lines)
 
-2019-04-27 : TD Actor-Critic added (72 lines)
+2019-04-27 : TD Actor-Critic added (74 lines)
 
-2019-05-06 : DQN added (111 lines,  including replay memory and target network)
+2019-05-06 : DQN added (113 lines,  including replay memory and target network)
+
+2019-05-17 : PPO added (114 lines,  including GAE)
 
 ## Dependencies
 1. PyTorch
@@ -22,4 +24,5 @@ PyTorch based.
 python3 REINFORCE.py
 python3 actor_critic.py
 python3 dqn.py
+python3 ppo.py
 ```
