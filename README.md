@@ -2,9 +2,9 @@
 
 Learn and practice basic RL algorithms with minimal lines of codes! (PyTorch based)
 
-All the environment is fixed to "CartPole-v1" from OpenAI GYM.
+Every environment is fixed to "CartPole-v1" from OpenAI GYM.
 
-You can just focus on the implementation.
+You can just focus on the implementations of various algorithms.
 
 
 
