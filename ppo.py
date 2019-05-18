@@ -11,7 +11,8 @@ class PPO(nn.Module):
         self.data = []
         self.gamma = 0.98
         self.lmbda = 0.95
-        self.eps = 0.2
+        self.eps = 0.1
+        self.K = 2 #epoch
         
         self.fc1 = nn.Linear(4,256)
         self.fc_pi = nn.Linear(256,2)
@@ -53,30 +54,31 @@ class PPO(nn.Module):
         
     def train(self):
         s,a,r,s_prime,done_mask, prob_a = self.make_batch()
-        
-        td_target = r + self.gamma * self.v(s_prime) * done_mask
-        delta = td_target - self.v(s)
-        delta = delta.detach().numpy()
 
-        advantage_lst = []
-        advantage = 0
-        for item in delta[::-1]:
-            advantage = self.gamma * self.lmbda * advantage + item[0]
-            advantage_lst.append([advantage])
-        advantage_lst.reverse()
-        advantage = torch.tensor(advantage_lst, dtype=torch.float)
+        for i in range(self.K):
+            td_target = r + self.gamma * self.v(s_prime) * done_mask
+            delta = td_target - self.v(s)
+            delta = delta.detach().numpy()
 
-        pi = self.pi(s,softmax_dim=1)
-        pi_a = pi.gather(1,a)
-        ratio = torch.exp(torch.log(pi_a) - torch.log(prob_a))  # a/b == log(exp(a)-exp(b))
+            advantage_lst = []
+            advantage = 0
+            for item in delta[::-1]:
+                advantage = self.gamma * self.lmbda * advantage + item[0]
+                advantage_lst.append([advantage])
+            advantage_lst.reverse()
+            advantage = torch.tensor(advantage_lst, dtype=torch.float)
 
-        surr1 = ratio * advantage
-        surr2 = torch.clamp(ratio, 1-self.eps, 1+self.eps) * advantage
-        loss = -torch.min(surr1, surr2) + F.smooth_l1_loss(td_target.detach(), self.v(s))
+            pi = self.pi(s,softmax_dim=1)
+            pi_a = pi.gather(1,a)
+            ratio = torch.exp(torch.log(pi_a) - torch.log(prob_a))  # a/b == log(exp(a)-exp(b))
 
-        self.optimizer.zero_grad()
-        loss.mean().backward()
-        self.optimizer.step()
+            surr1 = ratio * advantage
+            surr2 = torch.clamp(ratio, 1-self.eps, 1+self.eps) * advantage
+            loss = -torch.min(surr1, surr2) + F.smooth_l1_loss(td_target.detach(), self.v(s))
+
+            self.optimizer.zero_grad()
+            loss.mean().backward()
+            self.optimizer.step()
         
 def main():
     env = gym.make('CartPole-v1')

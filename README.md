@@ -14,7 +14,7 @@ You can just focus on the implementation.
 
 2019-05-06 : DQN added (113 lines,  including replay memory and target network)
 
-2019-05-17 : PPO added (114 lines,  including GAE)
+2019-05-17 : PPO added (116 lines,  including GAE)
 
 ## Dependencies
 1. PyTorch
