@@ -70,7 +70,7 @@ class PPO(nn.Module):
 
             pi = self.pi(s,softmax_dim=1)
             pi_a = pi.gather(1,a)
-            ratio = torch.exp(torch.log(pi_a) - torch.log(prob_a))  # a/b == log(exp(a)-exp(b))
+            ratio = torch.exp(torch.log(pi_a) - torch.log(prob_a))  # a/b == exp(log(a)-log(b))
 
             surr1 = ratio * advantage
             surr2 = torch.clamp(ratio, 1-self.eps, 1+self.eps) * advantage
