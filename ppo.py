@@ -30,8 +30,8 @@ class PPO(nn.Module):
         v = self.fc_v(x)
         return v
       
-    def put_data(self, item):
-        self.data.append(item)
+    def put_data(self, transition):
+        self.data.append(transition)
         
     def make_batch(self):
         s_lst, a_lst, r_lst, s_prime_lst, prob_a_lst, done_lst = [], [], [], [], [], []
@@ -62,8 +62,8 @@ class PPO(nn.Module):
 
             advantage_lst = []
             advantage = 0
-            for item in delta[::-1]:
-                advantage = self.gamma * self.lmbda * advantage + item[0]
+            for delta_t in delta[::-1]:
+                advantage = self.gamma * self.lmbda * advantage + delta_t[0]
                 advantage_lst.append([advantage])
             advantage_lst.reverse()
             advantage = torch.tensor(advantage_lst, dtype=torch.float)
