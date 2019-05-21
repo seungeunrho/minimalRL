@@ -7,14 +7,19 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
+#Hyperparameters
+learning_rate = 0.0005
+gamma         = 0.98
+buffer_limit  = 50000
+batch_size    = 32
+
 class ReplayBuffer():
     def __init__(self):
         self.buffer = collections.deque()
-        self.size_limit = 50000
     
     def put(self, data):
         self.buffer.append(data)
-        if len(self.buffer) > self.size_limit:
+        if len(self.buffer) > buffer_limit:
             self.buffer.popleft()
     
     def sample(self, n):
@@ -44,7 +49,7 @@ class Qnet(nn.Module):
         else : 
             return out.argmax().item()
             
-def train(q, q_target, memory, gamma, optimizer, batch_size):
+def train(q, q_target, memory, gamma, optimizer):
     for i in range(10):
         batch = memory.sample(batch_size)
         s_lst, a_lst, r_lst, s_prime_lst, done_mask_lst = [], [], [], [], []
@@ -78,10 +83,8 @@ def main():
     memory = ReplayBuffer()
 
     print_interval = 20
-    score = 0.0
-    gamma = 0.98
-    batch_size = 32
-    optimizer = optim.Adam(q.parameters(), lr=0.0005)
+    score = 0.0  
+    optimizer = optim.Adam(q.parameters(), lr=learning_rate)
 
     for n_epi in range(10000):
         epsilon = max(0.01, 0.08 - 0.01*(n_epi/200)) #Linear annealing from 8% to 1%
@@ -98,9 +101,8 @@ def main():
             if done:
                 break
             
-
         if memory.size()>2000:
-            train(q, q_target, memory, gamma, optimizer, batch_size)
+            train(q, q_target, memory, gamma, optimizer)
 
         if n_epi%print_interval==0 and n_epi!=0:
             q_target.load_state_dict(q.state_dict())

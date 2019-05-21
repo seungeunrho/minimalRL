@@ -6,6 +6,10 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.distributions import Categorical
 
+#Hyperparameters
+learning_rate = 0.005
+gamma         = 0.99
+
 class ActorCritic(nn.Module):
     def __init__(self):
         super(ActorCritic, self).__init__()
@@ -14,12 +18,12 @@ class ActorCritic(nn.Module):
         self.fc1 = nn.Linear(4, 128)
         self.fc_pi = nn.Linear(128, 2)
         self.fc_v = nn.Linear(128, 1)
-        self.optimizer = optim.Adam(self.parameters(), lr=0.005)
+        self.optimizer = optim.Adam(self.parameters(), lr=learning_rate)
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
-        pol = self.fc_pi(x)
-        pi = F.softmax(pol, dim=0)
+        pi = self.fc_pi(x)
+        pi = F.softmax(pi, dim=0)
         v = self.fc_v(x)
         return pi, v
     
@@ -38,10 +42,9 @@ class ActorCritic(nn.Module):
 def main():
     env = gym.make('CartPole-v1')
     model = ActorCritic()
-    gamma = 0.99
 
     score = 0.0
-    print_interval = 30
+    print_interval = 20
 
     for n_epi in range(10000):
         obs = env.reset()

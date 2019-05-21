@@ -6,15 +6,18 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.distributions import Categorical
 
+#Hyperparameters
+learning_rate = 0.0005
+gamma         = 0.99
+
 class Policy(nn.Module):
     def __init__(self):
         super(Policy, self).__init__()
         self.data = []
-        self.gamma = 0.99
         
         self.fc1 = nn.Linear(4, 128)
         self.fc2 = nn.Linear(128, 2)
-        self.optimizer = optim.Adam(self.parameters(), lr=0.0005)
+        self.optimizer = optim.Adam(self.parameters(), lr=learning_rate)
         
     def forward(self, x):
         x = F.relu(self.fc1(x))
@@ -27,7 +30,7 @@ class Policy(nn.Module):
     def train(self):
         R = 0
         for r, log_prob in self.data[::-1]:
-            R = r + R * self.gamma
+            R = r + R * gamma
             loss = -log_prob * R
             self.optimizer.zero_grad()
             loss.backward()
