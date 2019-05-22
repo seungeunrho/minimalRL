@@ -1,6 +1,7 @@
 import gym
 import random
 import collections
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -12,6 +13,7 @@ lr_q         = 0.001
 gamma        = 0.99
 batch_size   = 32
 buffer_limit = 50000
+tau          = 0.005 # for target network update
 
 class ReplayBuffer():
     def __init__(self):
@@ -58,6 +60,18 @@ class QNet(nn.Module):
         q = self.fc_3(q)
         return q
 
+class OrnsteinUhlenbeckNoise:
+    def __init__(self, mu):
+        self.theta, self.dt, self.sigma = 0.1, 0.01, 0.1
+        self.mu = mu
+        self.x_prev = np.zeros_like(self.mu)
+
+    def __call__(self):
+        x = self.x_prev + self.theta * (self.mu - self.x_prev) * self.dt + \
+                self.sigma * np.sqrt(self.dt) * np.random.normal(size=self.mu.shape)
+        self.x_prev = x
+        return x
+      
 def train(mu, mu_target, q, q_target, memory, gamma, q_optimizer, mu_optimizer):
     batch = memory.sample(batch_size)
     s_lst, a_lst, r_lst, s_prime_lst, done_mask_lst = [], [], [], [], []
@@ -85,6 +99,10 @@ def train(mu, mu_target, q, q_target, memory, gamma, q_optimizer, mu_optimizer):
     mu_loss.backward()
     mu_optimizer.step()
     
+def soft_update(net, net_target):
+    for param_target, param in zip(net_target.parameters(), net.parameters()):
+        param_target.data.copy_(param_target.data * (1.0 - tau) + param.data * tau)
+    
 def main():
     env = gym.make('Pendulum-v0')
     memory = ReplayBuffer()
@@ -98,28 +116,30 @@ def main():
     print_interval = 20
 
     mu_optimizer = optim.Adam(mu.parameters(), lr=lr_mu)
-    q_optimizer = optim.Adam(q.parameters(), lr=lr_q)
+    q_optimizer  = optim.Adam(q.parameters(), lr=lr_q)
+    ou_noise = OrnsteinUhlenbeckNoise(mu=np.zeros(1))
 
     for n_epi in range(10000):
         s = env.reset()
         
-        for t in range(300):
-            a = mu(torch.from_numpy(s).float())
-            s_prime, r, done, info = env.step([a.item()])
+        for t in range(300): # maximum length of episode is 200 for Pendulum-v0
+            a = mu(torch.from_numpy(s).float()) 
+            a = a.item() + ou_noise()[0]
+            s_prime, r, done, info = env.step([a])
             memory.put((s,a,r/100.0,s_prime,done))
             score +=r
             s = s_prime
 
             if done:
-                break
+                break              
                 
         if memory.size()>2000:
             for i in range(10):
                 train(mu, mu_target, q, q_target, memory, gamma, q_optimizer, mu_optimizer)
+                soft_update(mu, mu_target)
+                soft_update(q,  q_target)
         
         if n_epi%print_interval==0 and n_epi!=0:
-            q_target.load_state_dict(q.state_dict())
-            mu_target.load_state_dict(mu.state_dict())
             print("# of episode :{}, Avg timestep : {:.1f}".format(n_epi, score/print_interval))
             score = 0.0
 
