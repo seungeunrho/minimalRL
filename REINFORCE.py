@@ -1,4 +1,3 @@
-#REINFORCE 
 import gym
 import torch
 import torch.nn as nn
@@ -45,7 +44,7 @@ def main():
     
     for n_epi in range(10000):
         obs = env.reset()
-        for t in range(600):
+        for t in range(501): # CartPole-v1 forced to terminates at 500 step.
             obs = torch.tensor(obs, dtype=torch.float)
             out = pi(obs)
             m = Categorical(out)
