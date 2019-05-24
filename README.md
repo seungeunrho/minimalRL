@@ -4,6 +4,8 @@ Implementations of basic RL algorithms with minimal lines of codes! (PyTorch bas
 
 Envs are fixed to "CartPole-v1". You can just focus on the implementations.
 
+* 2019-05-23 : A3C added (116 lines)
+
 * 2019-05-21 : DDPG added (149 lines, including OU noise and soft target update)
 
 * 2019-05-17 : PPO added (116 lines,  including GAE)
