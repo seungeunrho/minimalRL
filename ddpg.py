@@ -94,7 +94,7 @@ def train(mu, mu_target, q, q_target, memory, gamma, q_optimizer, mu_optimizer):
     q_loss.backward()
     q_optimizer.step()
     
-    mu_loss = -q(s,mu(s)).mean()
+    mu_loss = -q(s,mu(s)).mean() # That's all for policy loss. How simple it is..
     mu_optimizer.zero_grad()
     mu_loss.backward()
     mu_optimizer.step()
