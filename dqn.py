@@ -17,8 +17,8 @@ class ReplayBuffer():
     def __init__(self):
         self.buffer = collections.deque()
     
-    def put(self, data):
-        self.buffer.append(data)
+    def put(self, transition):
+        self.buffer.append(transition)
         if len(self.buffer) > buffer_limit:
             self.buffer.popleft()
     
@@ -49,10 +49,10 @@ class Qnet(nn.Module):
             
 def train(q, q_target, memory, optimizer):
     for i in range(10):
-        batch = memory.sample(batch_size)
+        mini_batch = memory.sample(batch_size)
         s_lst, a_lst, r_lst, s_prime_lst, done_mask_lst = [], [], [], [], []
         
-        for transition in batch:
+        for transition in mini_batch:
             s, a, r, s_prime, done_mask = transition
             s_lst.append(s)
             a_lst.append([a])
