@@ -49,13 +49,13 @@ class ActorCritic(nn.Module):
                                                                torch.tensor(done_lst, dtype=torch.float)
         self.data = []
         return s_batch, a_batch, r_batch, s_prime_batch, done_batch
-      
-    
-    def train(self):
+  
+    def train_net(self):
         s, a, r, s_prime, done = self.make_batch()
         td_target = r + gamma * self.v(s_prime) * done
         delta = td_target - self.v(s)
-        pi = self.pi(s,softmax_dim=1)
+        
+        pi = self.pi(s, softmax_dim=1)
         pi_a = pi.gather(1,a)
         loss = -torch.log(pi_a) * delta.detach() + F.smooth_l1_loss(td_target.detach(), self.v(s))
 
@@ -86,7 +86,8 @@ def main():
                 
                 if done:
                     break                     
-            model.train()
+            
+            model.train_net()
             
         if n_epi%print_interval==0 and n_epi!=0:
             print("# of episode :{}, avg score : {:.1f}".format(n_epi, score/print_interval))

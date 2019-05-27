@@ -13,7 +13,7 @@ lr_q         = 0.001
 gamma        = 0.99
 batch_size   = 32
 buffer_limit = 50000
-tau          = 0.005 # for target network update
+tau          = 0.005 # for target network soft update
 
 class ReplayBuffer():
     def __init__(self):
@@ -72,7 +72,7 @@ class OrnsteinUhlenbeckNoise:
         self.x_prev = x
         return x
       
-def train(mu, mu_target, q, q_target, memory, gamma, q_optimizer, mu_optimizer):
+def train(mu, mu_target, q, q_target, memory, q_optimizer, mu_optimizer):
     batch = memory.sample(batch_size)
     s_lst, a_lst, r_lst, s_prime_lst, done_mask_lst = [], [], [], [], []
 
@@ -135,7 +135,7 @@ def main():
                 
         if memory.size()>2000:
             for i in range(10):
-                train(mu, mu_target, q, q_target, memory, gamma, q_optimizer, mu_optimizer)
+                train(mu, mu_target, q, q_target, memory, q_optimizer, mu_optimizer)
                 soft_update(mu, mu_target)
                 soft_update(q,  q_target)
         

@@ -47,7 +47,7 @@ class Qnet(nn.Module):
         else : 
             return out.argmax().item()
             
-def train(q, q_target, memory, gamma, optimizer):
+def train(q, q_target, memory, optimizer):
     for i in range(10):
         batch = memory.sample(batch_size)
         s_lst, a_lst, r_lst, s_prime_lst, done_mask_lst = [], [], [], [], []
@@ -92,7 +92,7 @@ def main():
             a = q.sample_action(torch.from_numpy(s).float(), epsilon)      
             s_prime, r, done, info = env.step(a)
             done_mask = 0.0 if done else 1.0
-            memory.put((s,a,r/200.0,s_prime, done_mask))
+            memory.put((s,a,r/100.0,s_prime, done_mask))
             s = s_prime
 
             score += r
@@ -100,7 +100,7 @@ def main():
                 break
             
         if memory.size()>2000:
-            train(q, q_target, memory, gamma, optimizer)
+            train(q, q_target, memory, optimizer)
 
         if n_epi%print_interval==0 and n_epi!=0:
             q_target.load_state_dict(q.state_dict())

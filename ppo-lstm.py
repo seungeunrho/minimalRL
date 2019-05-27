@@ -59,13 +59,13 @@ class PPO(nn.Module):
             done_mask = 0 if done else 1
             done_lst.append([done_mask])
             
-        s,a,r,s_prime,done_mask, prob_a = torch.tensor(s_lst, dtype=torch.float), torch.tensor(a_lst), \
-                                          torch.tensor(r_lst), torch.tensor(s_prime_lst, dtype=torch.float), \
-                                          torch.tensor(done_lst, dtype=torch.float), torch.tensor(prob_a_lst)
+        s,a,r,s_prime,done_mask,prob_a = torch.tensor(s_lst, dtype=torch.float), torch.tensor(a_lst), \
+                                         torch.tensor(r_lst), torch.tensor(s_prime_lst, dtype=torch.float), \
+                                         torch.tensor(done_lst, dtype=torch.float), torch.tensor(prob_a_lst)
         self.data = []
-        return s,a,r,s_prime,done_mask, prob_a, hidden_lst[0]
+        return s,a,r,s_prime, done_mask, prob_a, hidden_lst[0]
         
-    def train(self):
+    def train_net(self):
         s,a,r,s_prime,done_mask, prob_a, (h1,h2) = self.make_batch()
         first_hidden = (h1.detach(), h2.detach())
 
@@ -115,6 +115,7 @@ def main():
                 m = Categorical(prob)
                 a = m.sample().item()
                 s_prime, r, done, info = env.step(a)
+
                 model.put_data((s, a, r/100.0, s_prime, prob[a].item(), hidden, done))
                 s = s_prime
 
@@ -122,7 +123,7 @@ def main():
                 if done:
                     break
                     
-            model.train()
+            model.train_net()
 
         if n_epi%print_interval==0 and n_epi!=0:
             print("# of episode :{}, avg score : {:.1f}".format(n_epi, score/print_interval))

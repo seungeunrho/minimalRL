@@ -54,10 +54,10 @@ class PPO(nn.Module):
                                           torch.tensor(r_lst), torch.tensor(s_prime_lst, dtype=torch.float), \
                                           torch.tensor(done_lst, dtype=torch.float), torch.tensor(prob_a_lst)
         self.data = []
-        return s,a,r,s_prime,done_mask, prob_a
+        return s, a, r, s_prime, done_mask, prob_a
         
-    def train(self):
-        s,a,r,s_prime,done_mask, prob_a = self.make_batch()
+    def train_net(self):
+        s, a, r, s_prime, done_mask, prob_a = self.make_batch()
 
         for i in range(K_epoch):
             td_target = r + gamma * self.v(s_prime) * done_mask
@@ -65,14 +65,14 @@ class PPO(nn.Module):
             delta = delta.detach().numpy()
 
             advantage_lst = []
-            advantage = 0
+            advantage = 0.0
             for delta_t in delta[::-1]:
                 advantage = gamma * lmbda * advantage + delta_t[0]
                 advantage_lst.append([advantage])
             advantage_lst.reverse()
             advantage = torch.tensor(advantage_lst, dtype=torch.float)
 
-            pi = self.pi(s,softmax_dim=1)
+            pi = self.pi(s, softmax_dim=1)
             pi_a = pi.gather(1,a)
             ratio = torch.exp(torch.log(pi_a) - torch.log(prob_a))  # a/b == exp(log(a)-log(b))
 
@@ -99,6 +99,7 @@ def main():
                 m = Categorical(prob)
                 a = m.sample().item()
                 s_prime, r, done, info = env.step(a)
+
                 model.put_data((s, a, r/100.0, s_prime, prob[a].item(), done))
                 s = s_prime
 
@@ -106,7 +107,7 @@ def main():
                 if done:
                     break
 
-            model.train()
+            model.train_net()
 
         if n_epi%print_interval==0 and n_epi!=0:
             print("# of episode :{}, avg score : {:.1f}".format(n_epi, score/print_interval))
