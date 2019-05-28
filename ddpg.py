@@ -15,20 +15,6 @@ batch_size   = 32
 buffer_limit = 50000
 tau          = 0.005 # for target network soft update
 
-class ReplayBuffer():
-    def __init__(self):
-        self.buffer = collections.deque()
-
-    def put(self, transition):
-        self.buffer.append(transition)
-        if len(self.buffer) > buffer_limit:
-            self.buffer.popleft()
-    
-    def sample(self, n):
-        return random.sample(self.buffer, n)
-    
-    def size(self):
-        return len(self.buffer)
 
 class MuNet(nn.Module):
     def __init__(self):
@@ -72,8 +58,8 @@ class OrnsteinUhlenbeckNoise:
         self.x_prev = x
         return x
       
-def train(mu, mu_target, q, q_target, memory, q_optimizer, mu_optimizer):
-    mini_batch = memory.sample(batch_size)
+def train(mu, mu_target, q, q_target, replay_buffer, q_optimizer, mu_optimizer):
+    mini_batch = random.sample(replay_buffer, batch_size)
     s_lst, a_lst, r_lst, s_prime_lst, done_mask_lst = [], [], [], [], []
 
     for transition in mini_batch:
@@ -105,7 +91,7 @@ def soft_update(net, net_target):
     
 def main():
     env = gym.make('Pendulum-v0')
-    memory = ReplayBuffer()
+    replay_buffer = collections.deque(maxlen=buffer_limit)
 
     q, q_target = QNet(), QNet()
     q_target.load_state_dict(q.state_dict())
@@ -126,16 +112,16 @@ def main():
             a = mu(torch.from_numpy(s).float()) 
             a = a.item() + ou_noise()[0]
             s_prime, r, done, info = env.step([a])
-            memory.put((s,a,r/100.0,s_prime,done))
+            replay_buffer.append((s, a, r/100.0, s_prime, done))
             score +=r
             s = s_prime
 
             if done:
                 break              
                 
-        if memory.size()>2000:
+        if len(replay_buffer) > 2000:
             for i in range(10):
-                train(mu, mu_target, q, q_target, memory, q_optimizer, mu_optimizer)
+                train(mu, mu_target, q, q_target, replay_buffer, q_optimizer, mu_optimizer)
                 soft_update(mu, mu_target)
                 soft_update(q,  q_target)
         
