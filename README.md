@@ -15,9 +15,9 @@ Implementations of basic RL algorithms with minimal lines of codes! (PyTorch bas
 ## Algorithms
 1. REINFORCE (67 lines)
 2. Vanilla Actor-Critic (98 lines)
-3. DQN (113 lines,  including replay memory and target network)
+3. DQN (111 lines,  including replay memory and target network)
 4. PPO (119 lines,  including GAE)
-5. DDPG (149 lines, including OU noise and soft target update)
+5. DDPG (147 lines, including OU noise and soft target update)
 6. A3C (116 lines)
 7. ACER added ! (149 lines)
 8. Any suggestion..?
