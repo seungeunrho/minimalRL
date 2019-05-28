@@ -37,4 +37,5 @@ python3 dqn.py
 python3 ppo.py
 python3 ddpg.py
 python3 a3c.py
+python3 acer.py
 ```
