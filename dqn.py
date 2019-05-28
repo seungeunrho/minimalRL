@@ -15,12 +15,10 @@ batch_size    = 32
 
 class ReplayBuffer():
     def __init__(self):
-        self.buffer = collections.deque()
+        self.buffer = collections.deque(maxlen=buffer_limit)
     
     def put(self, transition):
         self.buffer.append(transition)
-        if len(self.buffer) > buffer_limit:
-            self.buffer.popleft()
     
     def sample(self, n):
         return random.sample(self.buffer, n)

@@ -19,7 +19,8 @@ Implementations of basic RL algorithms with minimal lines of codes! (PyTorch bas
 4. PPO (119 lines,  including GAE)
 5. DDPG (149 lines, including OU noise and soft target update)
 6. A3C (116 lines)
-7. Any suggestion..?
+7. ACER added ! (149 lines)
+8. Any suggestion..?
 
 
 ## Dependencies

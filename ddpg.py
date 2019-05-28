@@ -17,12 +17,10 @@ tau          = 0.005 # for target network soft update
 
 class ReplayBuffer():
     def __init__(self):
-        self.buffer = collections.deque()
+        self.buffer = collections.deque(maxlen=buffer_limit)
 
     def put(self, transition):
         self.buffer.append(transition)
-        if len(self.buffer) > buffer_limit:
-            self.buffer.popleft()
     
     def sample(self, n):
         return random.sample(self.buffer, n)
@@ -94,7 +92,7 @@ def train(mu, mu_target, q, q_target, memory, q_optimizer, mu_optimizer):
     q_loss.backward()
     q_optimizer.step()
     
-    mu_loss = -q(s,mu(s)).mean() # That's all for policy loss. How simple it is..
+    mu_loss = -q(s,mu(s)).mean() # That's all for the policy loss.
     mu_optimizer.zero_grad()
     mu_loss.backward()
     mu_optimizer.step()
