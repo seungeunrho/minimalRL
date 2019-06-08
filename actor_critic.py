@@ -57,7 +57,7 @@ class ActorCritic(nn.Module):
         
         pi = self.pi(s, softmax_dim=1)
         pi_a = pi.gather(1,a)
-        loss = -torch.log(pi_a) * delta.detach() + F.smooth_l1_loss(td_target.detach(), self.v(s))
+        loss = -torch.log(pi_a) * delta.detach() + F.smooth_l1_loss(self.v(s), td_target.detach())
 
         self.optimizer.zero_grad()
         loss.mean().backward()

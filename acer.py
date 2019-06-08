@@ -102,7 +102,7 @@ def train(model, optimizer, memory, on_policy=False):
     
     loss1 = -rho_bar * torch.log(pi_a) * (q_ret - v) 
     loss2 = -correction_coeff * pi * torch.log(pi) * (q.detach()-v) # bias correction term
-    loss = loss1 + loss2.sum(1) + F.smooth_l1_loss(q_ret, q_a)
+    loss = loss1 + loss2.sum(1) + F.smooth_l1_loss(q_a, q_ret)
     
     optimizer.zero_grad()
     loss.mean().backward()

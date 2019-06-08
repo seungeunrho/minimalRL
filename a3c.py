@@ -71,7 +71,7 @@ def train(model, rank):
             advantage = td_target - model.v(s_batch)
             pi = model.pi(s_batch,softmax_dim=1)
             pi_a = pi.gather(1,a_batch)
-            loss = -torch.log(pi_a) * advantage.detach() + F.smooth_l1_loss(td_target.detach(), model.v(s_batch))
+            loss = -torch.log(pi_a) * advantage.detach() + F.smooth_l1_loss(model.v(s_batch), td_target.detach())
             
             optimizer.zero_grad()
             loss.mean().backward()
