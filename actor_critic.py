@@ -45,7 +45,7 @@ class ActorCritic(nn.Module):
             done_lst.append([done_mask])
         
         s_batch, a_batch, r_batch, s_prime_batch, done_batch = torch.tensor(s_lst, dtype=torch.float), torch.tensor(a_lst), \
-                                                               torch.tensor(r_lst, dtype=torch.float), torch.tensor(s_prime, dtype=torch.float), \
+                                                               torch.tensor(r_lst, dtype=torch.float), torch.tensor(s_prime_lst, dtype=torch.float), \
                                                                torch.tensor(done_lst, dtype=torch.float)
         self.data = []
         return s_batch, a_batch, r_batch, s_prime_batch, done_batch
