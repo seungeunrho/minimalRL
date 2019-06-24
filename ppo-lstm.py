@@ -109,14 +109,14 @@ def main():
         
         while not done:
             for t in range(T_horizon):
-                s_tensor = torch.from_numpy(s).float()
-                prob, hidden = model.pi(s_tensor, hidden)
+                h_input = hidden
+                prob, hidden = model.pi(torch.from_numpy(s).float(), h_input)
                 prob = prob.view(-1)
                 m = Categorical(prob)
                 a = m.sample().item()
                 s_prime, r, done, info = env.step(a)
 
-                model.put_data((s, a, r/100.0, s_prime, prob[a].item(), hidden, done))
+                model.put_data((s, a, r/100.0, s_prime, prob[a].item(), h_input, done))
                 s = s_prime
 
                 score += r
