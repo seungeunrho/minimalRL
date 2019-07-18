@@ -116,7 +116,6 @@ def test(global_model):
 if __name__ == '__main__':
     global_model = ActorCritic()
     global_model.share_memory()
-    # optimizer = SharedAdam(global_model.parameters())
 
     processes = []
     for rank in range(n_train_processes + 1):  # + 1 for test process
