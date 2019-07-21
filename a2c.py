@@ -8,28 +8,20 @@ import torch.multiprocessing as mp
 import time
 import numpy as np
 
-
 # Hyperparameters
 n_train_processes = 3
 learning_rate = 0.0002
 update_interval = 5
 gamma = 0.98
-max_train_steps = 60_000
-
-# Constants
+max_train_steps = 60000
 PRINT_INTERVAL = update_interval * 100
-DIM_STATE = 4
-DIM_HIDDEN = 256
-DIM_VALUE_OUT = 1
-DIM_PI_OUT = 2
-
 
 class ActorCritic(nn.Module):
     def __init__(self):
         super(ActorCritic, self).__init__()
-        self.fc1 = nn.Linear(DIM_STATE, DIM_HIDDEN)
-        self.fc_pi = nn.Linear(DIM_HIDDEN, DIM_PI_OUT)
-        self.fc_v = nn.Linear(DIM_HIDDEN, DIM_VALUE_OUT)
+        self.fc1 = nn.Linear(4, 256)
+        self.fc_pi = nn.Linear(256, 2)
+        self.fc_v = nn.Linear(256, 1)
 
     def pi(self, x, softmax_dim=1):
         x = F.relu(self.fc1(x))
@@ -41,7 +33,6 @@ class ActorCritic(nn.Module):
         x = F.relu(self.fc1(x))
         v = self.fc_v(x)
         return v
-
 
 def worker(worker_id, master_end, worker_end):
     master_end.close()  # Forbid worker to use the master end for messaging
@@ -68,7 +59,6 @@ def worker(worker_id, master_end, worker_end):
             worker_end.send((env.observation_space, env.action_space))
         else:
             raise NotImplementedError
-
 
 class ParallelEnv:
     def __init__(self, n_train_processes):
@@ -111,10 +101,7 @@ class ParallelEnv:
         self.step_async(actions)
         return self.step_wait()
 
-    def close(self):
-        """
-        Clean up the environments' resources.
-        """
+    def close(self):  # For clean up resources
         if self.closed:
             return
         if self.waiting:
@@ -124,7 +111,6 @@ class ParallelEnv:
         for worker in self.workers:
             worker.join()
             self.closed = True
-
 
 def test(step_idx, model):
     env = gym.make('CartPole-v1')
@@ -145,7 +131,6 @@ def test(step_idx, model):
 
     env.close()
 
-
 def compute_target(v_final, r_lst, mask_lst):
     G = v_final.reshape(-1)
     td_target = list()
@@ -155,7 +140,6 @@ def compute_target(v_final, r_lst, mask_lst):
         td_target.append(G)
 
     return torch.tensor(td_target[::-1]).float()
-
 
 if __name__ == '__main__':
     envs = ParallelEnv(n_train_processes)
@@ -185,7 +169,7 @@ if __name__ == '__main__':
         td_target = compute_target(v_final, r_lst, mask_lst)
 
         td_target_vec = td_target.reshape(-1)
-        s_vec = torch.tensor(s_lst).float().reshape(-1, DIM_STATE)
+        s_vec = torch.tensor(s_lst).float().reshape(-1, 4)  # 4 == Dimension of state
         a_vec = torch.tensor(a_lst).reshape(-1).unsqueeze(1)
         advantage = td_target_vec - model.v(s_vec).reshape(-1)
 
