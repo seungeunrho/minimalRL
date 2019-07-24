@@ -14,7 +14,7 @@ Implementations of basic RL algorithms with minimal lines of codes! (PyTorch bas
 
 ## Algorithms
 1. [REINFORCE](https://github.com/seungeunrho/minimalRL/blob/master/REINFORCE.py) (67 lines)
-2. [Vanilla Actor-Critic](https://github.com/seungeunrho/minimalRL/blob/master/REINFORCE.py) (98 lines)
+2. [Vanilla Actor-Critic](https://github.com/seungeunrho/minimalRL/blob/master/actor_critic.py) (98 lines)
 3. [DQN](https://github.com/seungeunrho/minimalRL/blob/master/dqn.py) (112 lines,  including replay memory and target network)
 4. [PPO](https://github.com/seungeunrho/minimalRL/blob/master/ppo.py) (119 lines,  including GAE)
 5. [DDPG](https://github.com/seungeunrho/minimalRL/blob/master/ddpg.py) (147 lines, including OU noise and soft target update)
