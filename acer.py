@@ -101,7 +101,7 @@ def train(model, optimizer, memory, on_policy=False):
     q_ret = torch.tensor(q_ret_lst, dtype=torch.float).unsqueeze(1)
     
     loss1 = -rho_bar * torch.log(pi_a) * (q_ret - v) 
-    loss2 = -correction_coeff * pi * torch.log(pi) * (q.detach()-v) # bias correction term
+    loss2 = -correction_coeff * pi.detach() * torch.log(pi) * (q.detach()-v) # bias correction term
     loss = loss1 + loss2.sum(1) + F.smooth_l1_loss(q_a, q_ret)
     
     optimizer.zero_grad()
