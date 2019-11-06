@@ -10,10 +10,10 @@ class PPO(nn.Module):
         super(PPO, self).__init__()
         self.data = []
         
-        self.fc1   = nn.Linear(3,1024)
-        self.fc_v  = nn.Linear(1024,1)
-        self.fc_pi = nn.Linear(1024,1)
-        self.fc_sigma = nn.Linear(1024,1)
+        self.fc1   = nn.Linear(3,64)
+        self.fc_v  = nn.Linear(64,1)
+        self.fc_pi = nn.Linear(64,1)
+        self.fc_sigma = nn.Linear(64,1)
     
         
         self.optimizer = optim.Adam(self.parameters(), lr=learning_rate)
@@ -55,7 +55,7 @@ class PPO(nn.Module):
         
     def train_net(self):
         s, a, r, s_prime, done_mask, prob_a = self.make_batch()
-
+        global entropy
         for i in range(K_epoch):
             td_target = r + gamma * self.v(s_prime) * done_mask
             delta = td_target - self.v(s)
@@ -78,20 +78,19 @@ class PPO(nn.Module):
             ratio = torch.exp(pi_a - prob_a.detach())
             surr1 = ratio * advantage
             surr2 = torch.clamp(ratio, 1-eps_clip, 1+eps_clip) * advantage
-            loss_first = (-torch.min(surr1, surr2) + entropy).mean() 
+            loss_first = (-torch.min(surr1, surr2) - entropy).mean() 
             loss_second = critic_coef * F.smooth_l1_loss(self.v(s) , td_target.detach())
             loss = loss_first + loss_second
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
-   
-entropy_coef = 1e-3
-critic_coef = 2
+entropy_coef = 1e-2
+critic_coef = 1/2
 learning_rate = 0.0001
 gamma         = 0.99
 lmbda         = 0.95
 eps_clip      = 0.1
-K_epoch       = 10
+K_epoch       = 4
 T_horizon     = 32
 
 env = gym.make('Pendulum-v0')
@@ -125,7 +124,6 @@ def main(render = False):
                     break
             model.train_net()
         if n_epi%print_interval==0 and n_epi!=0:
-
             print("# of episode :{}, avg score : {:.1f}".format(n_epi, score/print_interval))
             score = 0.0
 
