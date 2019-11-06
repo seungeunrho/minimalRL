@@ -79,13 +79,14 @@ class PPO(nn.Module):
             surr1 = ratio * advantage
             surr2 = torch.clamp(ratio, 1-eps_clip, 1+eps_clip) * advantage
             loss_first = (-torch.min(surr1, surr2) + entropy).mean() 
-            loss_second = 2 * F.smooth_l1_loss(self.v(s) , td_target.detach())
+            loss_second = critic_coef * F.smooth_l1_loss(self.v(s) , td_target.detach())
             loss = loss_first + loss_second
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
    
 entropy_coef = 1e-3
+critic_coef = 2
 learning_rate = 0.0001
 gamma         = 0.99
 lmbda         = 0.95
