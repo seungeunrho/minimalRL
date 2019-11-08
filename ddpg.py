@@ -36,7 +36,7 @@ class ReplayBuffer():
         
         return torch.tensor(s_lst, dtype=torch.float), torch.tensor(a_lst), \
                torch.tensor(r_lst), torch.tensor(s_prime_lst, dtype=torch.float), \
-               torch.tensor(done_mask_lst)
+               torch.tensor(done_mask_lst, dtype = torch.float)
     
     def size(self):
         return len(self.buffer)
@@ -85,8 +85,8 @@ class OrnsteinUhlenbeckNoise:
       
 def train(mu, mu_target, q, q_target, memory, q_optimizer, mu_optimizer):
     s,a,r,s_prime,done_mask  = memory.sample(batch_size)
-    
-    target = r + gamma * q_target(s_prime, mu_target(s_prime))
+    done_mask = torch.abs(1-done_mask)
+    target = r + done_mask * gamma * q_target(s_prime, mu_target(s_prime))
     q_loss = F.smooth_l1_loss(q(s,a), target.detach())
     q_optimizer.zero_grad()
     q_loss.backward()
