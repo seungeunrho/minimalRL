@@ -2,7 +2,7 @@
 #  Code Style Change
 #  Debugging
 #    -reparameterization trick
-
+#    -target_critic and critic updated equally
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
