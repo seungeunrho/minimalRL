@@ -82,10 +82,10 @@ class TD3(nn.Module):
                                            + list(self.q_net_2.parameters()) ,lr = critic_learning_rate)
         self.mu_net = MuNet()
         self.mu_net_optimizer = optim.Adam(self.mu_net.parameters(), lr=actor_learning_rate)
-        self.target_q_net_1 = copy.copy(self.q_net_1)
-        self.target_q_net_2 = copy.copy(self.q_net_2)
-        self.target_mu_net = copy.copy(self.mu_net)
-        
+        self.target_q_net_1 = copy.deepcopy(self.q_net_1)
+        self.target_q_net_2 = copy.deepcopy(self.q_net_2)
+        self.target_mu_net = copy.deepcopy(self.mu_net)
+
         self.noise_generator = NoiseGenerator(0,0.2)
         
         self.train_num = 1
