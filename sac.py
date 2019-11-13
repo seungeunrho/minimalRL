@@ -2,7 +2,7 @@
 #  Code Style Change
 #  Debugging
 #    -reparameterization trick
-#    -target_critic and critic updated equally
+#    -target_critic and critic updated equally - fixed
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -56,6 +56,7 @@ class Actor(nn.Module):
         sigma = torch.exp(torch.clamp(self.sigma(x), self.min_log_std, self.max_log_std))
         dist = torch.distributions.normal.Normal(mu,sigma)
         return dist, mu, sigma
+
 class Critic(nn.Module):
     def __init__(self):
         super(Critic,self).__init__()
@@ -67,6 +68,7 @@ class Critic(nn.Module):
         x = F.relu(self.critic_2(x))
         x = (self.critic_3(x))
         return x
+
 class Q(nn.Module):
     def __init__(self):
         super(Q, self).__init__()
@@ -81,20 +83,25 @@ class Q(nn.Module):
         x = self.fc3(x)
         return x
 
-
 class SAC(nn.Module):
     def __init__(self):
         super(SAC,self).__init__()
         
         self.actor = Actor()
         self.critic = Critic()
-        self.target_critic = copy.copy(self.critic)
+        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr = critic_lr)
+        #self.target_critic = copy.copy(self.critic)
+        self.target_critic = Critic()
+        for param, target_param in zip(self.critic.parameters(), self.target_critic.parameters()):
+            target_param.data.copy_(param.data)
         self.q_1 = Q()
         self.q_2 = Q()
         
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr = actor_lr)
-        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr = critic_lr)
-        self.q_optimizer = optim.Adam(list(self.q_1.parameters()) + list(self.q_2.parameters()),lr = q_lr)
+        
+        #self.q_optimizer = optim.Adam(list(self.q_1.parameters()) + list(self.q_2.parameters()),lr = q_lr)
+        self.q_1_optimizer = optim.Adam(self.q_1.parameters(),lr = q_lr)
+        self.q_2_optimizer = optim.Adam(self.q_2.parameters(),lr = q_lr)
         
     def pi(self,x):
         action = self.actor(x)[0].sample()
@@ -102,37 +109,61 @@ class SAC(nn.Module):
         return action
     def train_net(self):
         s,a,r,s_prime,done_mask  = memory.sample(batch_size)
-        
         dist,mu,sigma = self.actor(s)
-        sample = dist.sample()
+        sample = dist.rsample()
         action = torch.tanh(sample)
-        log_prob = dist.log_prob(sample) - torch.log(1- action.pow(2) + epsilon) 
-
-        
+        #log_prob = dist.log_prob(sample) - torch.log(1- action.pow(2) + epsilon) 
+        log_prob = dist.log_prob(sample)
+        log_prob -= torch.log(1- action.pow(2)+epsilon)
         q_theta = torch.min(self.q_1(s,action), self.q_2(s,action))
         
-        loss_v = ((self.critic(s) - (q_theta - log_prob).detach()) ** 2).mean()
+        loss_v = F.mse_loss(self.critic(s) , (q_theta - log_prob).detach())
+
         self.critic_optimizer.zero_grad()
         loss_v.backward()
         self.critic_optimizer.step()
-        
-        loss_q_1 = (self.q_1(s,a) - (r + done_mask * lambd * self.target_critic(s_prime).detach())) ** 2
-        loss_q_2 = (self.q_2(s,a) - (r + done_mask * lambd * self.target_critic(s_prime).detach())) ** 2
-        
-        loss_q = (loss_q_1 + loss_q_2).mean()
-        
-        self.q_optimizer.zero_grad()
-        loss_q.backward()
-        self.q_optimizer.step()
 
+        target_value = (r + done_mask * lambd * self.target_critic(s_prime).detach())
+        
+        loss_q_1 = F.mse_loss(self.q_1(s,a),target_value)
+        loss_q_2 = F.mse_loss(self.q_2(s,a),target_value)
+    
+        
         loss_pi = (log_prob - q_theta).mean()
+        
+        self.q_1_optimizer.zero_grad()
+        loss_q_1.backward()
+        self.q_1_optimizer.step()
+        
+        self.q_2_optimizer.zero_grad()
+        loss_q_2.backward()
+        self.q_2_optimizer.step()
         
         self.actor_optimizer.zero_grad()
         loss_pi.backward()
         self.actor_optimizer.step()
         for param, target_param in zip(self.critic.parameters(), self.target_critic.parameters()):
             target_param.data.copy_(tau * param.data + (1 - tau) * target_param.data)
+
+class NormalizedActions(gym.ActionWrapper):
+    def action(self, action):
+        low  = self.action_space.low
+        high = self.action_space.high
         
+        action = low + (action + 1.0) * 0.5 * (high - low)
+        action = np.clip(action, low, high)
+        
+        return action
+
+    def reverse_action(self, action):
+        low  = self.action_space.low
+        high = self.action_space.high
+        
+        action = 2 * (action - low) / (high - low) - 1
+        action = np.clip(action, low, high)
+        
+        return action
+
 actor_lr = 3e-4
 critic_lr = 3e-4
 q_lr = 3e-4
@@ -143,7 +174,7 @@ tau = 0.005
 buffer_limit = int(1e+6)
 memory = ReplayBuffer()
 
-env = gym.make('Pendulum-v0')
+env = NormalizedActions(gym.make("Pendulum-v0"))
 model = SAC()
 memory = ReplayBuffer()
 
@@ -162,11 +193,12 @@ def main(render = False):
             if render:
                 env.render()
             a = model.pi(torch.from_numpy(s).float()).item()
-            s_prime, r, done, info = env.step([a* 2])
+
+            s_prime, r, done, info = env.step(a)
             
             memory.put((s,a,r/100.0,s_prime,False)) #done
             s = s_prime
-            print('global_step : ',global_step, ' action : ',a,' reward : ',r,' done : ',done)
+            #print('global_step : ',global_step, ' action : ',a,' reward : ',r,' done : ',done)
             score += r
             if done:
                 break
