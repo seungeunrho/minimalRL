@@ -1,6 +1,7 @@
 #TODO
 #  Code Style Change
 #  Debugging
+#    -reparameterization trick
 
 import torch
 import torch.nn as nn
