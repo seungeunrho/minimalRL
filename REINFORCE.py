@@ -28,9 +28,9 @@ class Policy(nn.Module):
         
     def train_net(self):
         R = 0
-        for r, log_prob in self.data[::-1]:
+        for r, prob in self.data[::-1]:
             R = r + gamma * R
-            loss = -log_prob * R
+            loss = -torch.log(prob) * R
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
@@ -49,7 +49,7 @@ def main():
             m = Categorical(prob)
             a = m.sample()
             s_prime, r, done, info = env.step(a.item())
-            pi.put_data((r,torch.log(prob[a])))
+            pi.put_data((r,prob[a]))
             
             s = s_prime
             score += r
