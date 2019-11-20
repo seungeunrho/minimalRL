@@ -46,16 +46,17 @@ class PPO(nn.Module):
         self.data.append(transition)
         
     def make_batch(self):
-        s_lst, a_lst, r_lst, s_prime_lst, prob_a_lst, hidden_lst, done_lst = [], [], [], [], [], [], []
+        s_lst, a_lst, r_lst, s_prime_lst, prob_a_lst, h_in_lst, h_out_lst, done_lst = [], [], [], [], [], [], [], []
         for transition in self.data:
-            s, a, r, s_prime, prob_a, hidden, done = transition
+            s, a, r, s_prime, prob_a, h_in, h_out, done = transition
             
             s_lst.append(s)
             a_lst.append([a])
             r_lst.append([r])
             s_prime_lst.append(s_prime)
             prob_a_lst.append([prob_a])
-            hidden_lst.append(hidden)
+            h_in_lst.append(h_in)
+            h_out_lst.append(h_out)
             done_mask = 0 if done else 1
             done_lst.append([done_mask])
             
@@ -63,14 +64,15 @@ class PPO(nn.Module):
                                          torch.tensor(r_lst), torch.tensor(s_prime_lst, dtype=torch.float), \
                                          torch.tensor(done_lst, dtype=torch.float), torch.tensor(prob_a_lst)
         self.data = []
-        return s,a,r,s_prime, done_mask, prob_a, hidden_lst[0]
+        return s,a,r,s_prime, done_mask, prob_a, h_in_lst[0], h_out_lst[0]
         
     def train_net(self):
-        s,a,r,s_prime,done_mask, prob_a, (h1,h2) = self.make_batch()
-        first_hidden = (h1.detach(), h2.detach())
+        s,a,r,s_prime,done_mask, prob_a, (h1_in, h2_in), (h1_out, h2_out) = self.make_batch()
+        first_hidden  = (h1_in.detach(), h2_in.detach())
+        second_hidden = (h1_out.detach(), h2_out.detach())
 
         for i in range(K_epoch):
-            v_prime = self.v(s_prime, first_hidden).squeeze(1)
+            v_prime = self.v(s_prime, second_hidden).squeeze(1)
             td_target = r + gamma * v_prime * done_mask
             v_s = self.v(s, first_hidden).squeeze(1)
             delta = td_target - v_s
@@ -103,20 +105,20 @@ def main():
     print_interval = 20
     
     for n_epi in range(10000):
-        hidden = (torch.zeros([1, 1, 32], dtype=torch.float), torch.zeros([1, 1, 32], dtype=torch.float))
+        h_out = (torch.zeros([1, 1, 32], dtype=torch.float), torch.zeros([1, 1, 32], dtype=torch.float))
         s = env.reset()
         done = False
         
         while not done:
             for t in range(T_horizon):
-                h_input = hidden
-                prob, hidden = model.pi(torch.from_numpy(s).float(), h_input)
+                h_in = h_out
+                prob, h_out = model.pi(torch.from_numpy(s).float(), h_in)
                 prob = prob.view(-1)
                 m = Categorical(prob)
                 a = m.sample().item()
                 s_prime, r, done, info = env.step(a)
 
-                model.put_data((s, a, r/100.0, s_prime, prob[a].item(), h_input, done))
+                model.put_data((s, a, r/100.0, s_prime, prob[a].item(), h_in, h_out, done))
                 s = s_prime
 
                 score += r
