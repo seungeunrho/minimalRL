@@ -18,29 +18,47 @@ class Policy(nn.Module):
         self.fc2 = nn.Linear(128, 2)
         self.optimizer = optim.Adam(self.parameters(), lr=learning_rate)
         
-    def forward(self, x):
+    def forward(self, x,dim = 0):
         x = F.relu(self.fc1(x))
-        x = F.softmax(self.fc2(x), dim=0)
+        x = F.softmax(self.fc2(x), dim=dim)
         return x
       
     def put_data(self, item):
         self.data.append(item)
         
     def train_net(self):
+        s = torch.tensor(list(map(lambda x : x[0],self.data)),dtype= torch.float)
+        a = torch.tensor(list(map(lambda x : [x[1]],self.data)))
         R = 0
+<<<<<<< HEAD
+        R_lst = []
+        for _,_,r in self.data[::-1]:
+            R = r + gamma * R
+            R_lst.append(R)
+        R_lst.reverse()
+        R = torch.tensor(R_lst, dtype=torch.float).reshape(-1,1)
+
+        prob = self.forward(s,dim = 1)
+        prob = prob.gather(1,a)
+        loss = - torch.log(prob) * R
+        self.optimizer.zero_grad()
+        loss.mean().backward()
+        self.optimizer.step()
+=======
         for r, prob in self.data[::-1]:
             R = r + gamma * R
             loss = -torch.log(prob) * R
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
+>>>>>>> upstream/master
         self.data = []
 
 def main():
     env = gym.make('CartPole-v1')
     pi = Policy()
     score = 0.0
-    print_interval = 20
+    print_interval = 100
     
     for n_epi in range(10000):
         s = env.reset()
@@ -49,13 +67,17 @@ def main():
             m = Categorical(prob)
             a = m.sample()
             s_prime, r, done, info = env.step(a.item())
+<<<<<<< HEAD
+            pi.put_data((s,a,r))
+=======
             pi.put_data((r,prob[a]))
             
+>>>>>>> upstream/master
             s = s_prime
             score += r
             if done:
                 break
-
+        
         pi.train_net()
         
         if n_epi%print_interval==0 and n_epi!=0:
