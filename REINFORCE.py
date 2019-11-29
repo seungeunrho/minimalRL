@@ -30,7 +30,6 @@ class Policy(nn.Module):
         s = torch.tensor(list(map(lambda x : x[0],self.data)),dtype= torch.float)
         a = torch.tensor(list(map(lambda x : [x[1]],self.data)))
         R = 0
-<<<<<<< HEAD
         R_lst = []
         for _,_,r in self.data[::-1]:
             R = r + gamma * R
@@ -44,14 +43,6 @@ class Policy(nn.Module):
         self.optimizer.zero_grad()
         loss.mean().backward()
         self.optimizer.step()
-=======
-        for r, prob in self.data[::-1]:
-            R = r + gamma * R
-            loss = -torch.log(prob) * R
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
->>>>>>> upstream/master
         self.data = []
 
 def main():
@@ -67,12 +58,8 @@ def main():
             m = Categorical(prob)
             a = m.sample()
             s_prime, r, done, info = env.step(a.item())
-<<<<<<< HEAD
             pi.put_data((s,a,r))
-=======
-            pi.put_data((r,prob[a]))
-            
->>>>>>> upstream/master
+
             s = s_prime
             score += r
             if done:
