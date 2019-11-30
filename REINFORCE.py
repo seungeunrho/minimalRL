@@ -6,7 +6,7 @@ import torch.optim as optim
 from torch.distributions import Categorical
 
 #Hyperparameters
-learning_rate = 0.0002
+learning_rate = 0.002
 gamma         = 0.98
 
 class Policy(nn.Module):
@@ -41,7 +41,7 @@ class Policy(nn.Module):
         prob = prob.gather(1,a)
         loss = - torch.log(prob) * R
         self.optimizer.zero_grad()
-        loss.mean().backward()
+        loss.sum().backward()
         self.optimizer.step()
         self.data = []
 
