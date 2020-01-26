@@ -8,6 +8,7 @@ from torch.distributions import Categorical
 #Hyperparameters
 learning_rate = 0.0002
 gamma         = 0.98
+n_rollout     = 10
 
 class ActorCritic(nn.Module):
     def __init__(self):
@@ -66,7 +67,6 @@ class ActorCritic(nn.Module):
 def main():  
     env = gym.make('CartPole-v1')
     model = ActorCritic()    
-    n_rollout = 5
     print_interval = 20
     score = 0.0
 
