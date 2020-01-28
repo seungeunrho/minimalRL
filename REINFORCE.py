@@ -41,10 +41,12 @@ def main():
     pi = Policy()
     score = 0.0
     print_interval = 20
-    done = False
+    
     
     for n_epi in range(10000):
         s = env.reset()
+        done = False
+        
         while not done: # CartPole-v1 forced to terminates at 500 step.
             prob = pi(torch.from_numpy(s).float())
             m = Categorical(prob)
