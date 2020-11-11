@@ -27,16 +27,17 @@ class ReplayBuffer():
         s_lst, a_lst, r_lst, s_prime_lst, done_mask_lst = [], [], [], [], []
 
         for transition in mini_batch:
-            s, a, r, s_prime, done_mask = transition
+            s, a, r, s_prime, done = transition
             s_lst.append(s)
             a_lst.append([a])
             r_lst.append([r])
             s_prime_lst.append(s_prime)
+            done_mask = 0.0 if done else 1.0 
             done_mask_lst.append([done_mask])
         
-        return torch.tensor(s_lst, dtype=torch.float), torch.tensor(a_lst), \
-               torch.tensor(r_lst), torch.tensor(s_prime_lst, dtype=torch.float), \
-               torch.tensor(done_mask_lst)
+        return torch.tensor(s_lst, dtype=torch.float), torch.tensor(a_lst, dtype=torch.float), \
+                torch.tensor(r_lst, dtype=torch.float), torch.tensor(s_prime_lst, dtype=torch.float), \
+                torch.tensor(done_mask_lst, dtype=torch.float)
     
     def size(self):
         return len(self.buffer)
@@ -57,18 +58,17 @@ class MuNet(nn.Module):
 class QNet(nn.Module):
     def __init__(self):
         super(QNet, self).__init__()
-        
         self.fc_s = nn.Linear(3, 64)
         self.fc_a = nn.Linear(1,64)
         self.fc_q = nn.Linear(128, 32)
-        self.fc_3 = nn.Linear(32,1)
+        self.fc_out = nn.Linear(32,1)
 
     def forward(self, x, a):
         h1 = F.relu(self.fc_s(x))
         h2 = F.relu(self.fc_a(a))
         cat = torch.cat([h1,h2], dim=1)
         q = F.relu(self.fc_q(cat))
-        q = self.fc_3(q)
+        q = self.fc_out(q)
         return q
 
 class OrnsteinUhlenbeckNoise:
@@ -86,7 +86,7 @@ class OrnsteinUhlenbeckNoise:
 def train(mu, mu_target, q, q_target, memory, q_optimizer, mu_optimizer):
     s,a,r,s_prime,done_mask  = memory.sample(batch_size)
     
-    target = r + gamma * q_target(s_prime, mu_target(s_prime))
+    target = r + gamma * q_target(s_prime, mu_target(s_prime)) * done_mask
     q_loss = F.smooth_l1_loss(q(s,a), target.detach())
     q_optimizer.zero_grad()
     q_loss.backward()
@@ -119,17 +119,15 @@ def main():
 
     for n_epi in range(10000):
         s = env.reset()
+        done = False
         
-        for t in range(300): # maximum length of episode is 200 for Pendulum-v0
+        while not done:
             a = mu(torch.from_numpy(s).float()) 
             a = a.item() + ou_noise()[0]
             s_prime, r, done, info = env.step([a])
             memory.put((s,a,r/100.0,s_prime,done))
             score +=r
             s = s_prime
-
-            if done:
-                break              
                 
         if memory.size()>2000:
             for i in range(10):
