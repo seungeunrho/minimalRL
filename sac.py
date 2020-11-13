@@ -64,8 +64,9 @@ class PolicyNet(nn.Module):
         dist = Normal(mu, std)
         action = dist.rsample()
         log_prob = dist.log_prob(action)
-        action = 2.0*torch.tanh(action)
-        return action, log_prob
+        real_action = torch.tanh(action)
+        real_log_prob = log_prob - torch.log(1-torch.tanh(action).pow(2) + 1e-7)
+        return real_action, real_log_prob
 
     def train_net(self, q1, q2, mini_batch):
         s, a, r, s_prime, done = mini_batch
@@ -145,7 +146,7 @@ def main():
 
         while not done:
             a, log_prob= pi(torch.from_numpy(s).float())
-            s_prime, r, done, info = env.step([a.item()])
+            s_prime, r, done, info = env.step([2.0*a.item()])
             memory.put((s, a.item(), r/10.0, s_prime, done))
             score +=r
             s = s_prime
@@ -161,7 +162,7 @@ def main():
                 q2.soft_update(q2_target)
                 
         if n_epi%print_interval==0 and n_epi!=0:
-            print("# of episode :{}, avg score : {:.1f} alpha:{:.5f}".format(n_epi, score/print_interval, pi.log_alpha.exp()))
+            print("# of episode :{}, avg score : {:.1f} alpha:{:.4f}".format(n_epi, score/print_interval, pi.log_alpha.exp()))
             score = 0.0
 
     env.close()
