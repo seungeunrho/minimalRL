@@ -56,16 +56,27 @@ class PolicyNet(nn.Module):
         mu = self.fc_mu(x)
         std = F.softplus(self.fc_std(x))
 
-        zero_mean = torch.zeros_like(mu)
-        one_std = torch.zeros_like(std) + 1.0
+        zero_mean, one_std = torch.zeros_like(mu), torch.zeros_like(std) + 1.0
         dist = Normal(zero_mean, one_std)
         noise = dist.sample()
         log_prob = dist.log_prob(noise)
         action = 2.0 * torch.tanh(mu + std * noise)  # since pendulum's action space is [-2,2]
         return action, log_prob
 
-    def sample_action(self, mu, sigma):
-        dist = Normal(mu, sigma)
+    def train_net(self, q1, q2, mini_batch):
+        s, a, r, s_prime, done = mini_batch
+        a_prime, log_prob = self.forward(s_prime)
+        entropy = -alpha * log_prob
+
+        q1_val, q2_val = q1(s,a_prime), q2(s,a_prime)
+        q1_q2 = torch.cat([q1_val, q2_val], dim=1)
+        min_q = torch.min(q1_q2, 1, keepdim=True)[0]
+
+        loss = -min_q - entropy # for gradient ascent
+        self.optimizer.zero_grad()
+        loss.mean().backward()
+        self.optimizer.step()
+
 
 class QNet(nn.Module):
     def __init__(self, learning_rate):
@@ -84,6 +95,17 @@ class QNet(nn.Module):
         q = self.fc_out(q)
         return q
 
+    def train_net(self, target, mini_batch):
+        s, a, r, s_prime, done = mini_batch
+        loss = F.smooth_l1_loss(self.forward(s, a) , target)
+        self.optimizer.zero_grad()
+        loss.mean().backward()
+        self.optimizer.step()
+
+    def soft_update(self, net_target):
+        for param_target, param in zip(net_target.parameters(), self.parameters()):
+            param_target.data.copy_(param_target.data * (1.0 - tau) + param.data * tau)
+
 def calc_target(pi, q1, q2, mini_batch):
     s, a, r, s_prime, done = mini_batch
 
@@ -96,41 +118,15 @@ def calc_target(pi, q1, q2, mini_batch):
         target = r + gamma * done * (min_q + entropy)
 
     return target
-
-def train_q(q, target, mini_batch):
-    s, a, r, s_prime, done = mini_batch
-    loss = F.smooth_l1_loss(q(s, a) , target)
-    q.optimizer.zero_grad()
-    loss.mean().backward()
-    q.optimizer.step()
-
-def train_pi(pi, q1, q2, mini_batch):
-    s, a, r, s_prime, done = mini_batch
-    a_prime, log_prob = pi(s_prime)
-    entropy = -alpha * log_prob
-
-    q1_val, q2_val = q1(s,a_prime), q2(s,a_prime)
-    q1_q2 = torch.cat([q1_val, q2_val], dim=1)
-    min_q = torch.min(q1_q2, 1, keepdim=True)[0]
-
-    loss = -min_q - entropy # for gradient ascent
-    pi.optimizer.zero_grad()
-    loss.mean().backward()
-    pi.optimizer.step()
-
-def soft_update(net, net_target):
-    for param_target, param in zip(net_target.parameters(), net.parameters()):
-        param_target.data.copy_(param_target.data * (1.0 - tau) + param.data * tau)
     
 def main():
     env = gym.make('Pendulum-v0')
     memory = ReplayBuffer()
-
     q1, q2, q1_target, q2_target = QNet(lr_q), QNet(lr_q), QNet(lr_q), QNet(lr_q)
+    pi = PolicyNet(lr_pi)
+
     q1_target.load_state_dict(q1.state_dict())
     q2_target.load_state_dict(q2.state_dict())
-
-    pi = PolicyNet(lr_pi)
 
     score = 0.0
     print_interval = 20
@@ -149,13 +145,13 @@ def main():
         if memory.size()>1000:
             for i in range(20):
                 mini_batch = memory.sample(batch_size)
-                target = calc_target(pi, q1_target, q2_target, mini_batch)
-                train_q(q1, target, mini_batch)
-                train_q(q2, target, mini_batch)
-                train_pi(pi, q1, q2, mini_batch)
-                soft_update(q1, q1_target)
-                soft_update(q2, q2_target)
-        
+                td_target = calc_target(pi, q1_target, q2_target, mini_batch)
+                q1.train_net(td_target, mini_batch)
+                q2.train_net(td_target, mini_batch)
+                pi.train_net(q1, q2, mini_batch)
+                q1.soft_update(q1_target)
+                q2.soft_update(q2_target)
+
         if n_epi%print_interval==0 and n_epi!=0:
             print("# of episode :{}, avg score : {:.1f}".format(n_epi, score/print_interval))
             score = 0.0
