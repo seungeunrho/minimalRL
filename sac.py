@@ -8,13 +8,15 @@ import numpy as np
 import collections, random
 
 #Hyperparameters
-lr_pi        = 0.0005
-lr_q         = 0.001
-alpha        = 0.05
-gamma        = 0.98
-batch_size   = 32
-buffer_limit = 50000
-tau           = 0.01 # for target network soft update
+lr_pi           = 0.0005
+lr_q            = 0.001
+init_alpha     = 0.01
+gamma           = 0.98
+batch_size      = 32
+buffer_limit   = 50000
+tau              = 0.01 # for target network soft update
+target_entropy = -1.0 # for automated alpha update
+lr_alpha        = 0.001  # for automated alpha update
 
 class ReplayBuffer():
     def __init__(self):
@@ -51,22 +53,24 @@ class PolicyNet(nn.Module):
         self.fc_std  = nn.Linear(128,1)
         self.optimizer = optim.Adam(self.parameters(), lr=learning_rate)
 
+        self.log_alpha = torch.tensor(np.log(init_alpha))
+        self.log_alpha.requires_grad = True
+        self.log_alpha_optimizer = optim.Adam([self.log_alpha], lr=lr_alpha)
+
     def forward(self, x):
         x = F.relu(self.fc1(x))
         mu = self.fc_mu(x)
         std = F.softplus(self.fc_std(x))
-
-        zero_mean, one_std = torch.zeros_like(mu), torch.zeros_like(std) + 1.0
-        dist = Normal(zero_mean, one_std)
-        noise = dist.sample()
-        log_prob = dist.log_prob(noise)
-        action = 2.0 * torch.tanh(mu + std * noise)  # since pendulum's action space is [-2,2]
+        dist = Normal(mu, std)
+        action = dist.rsample()
+        log_prob = dist.log_prob(action)
+        action = 2.0*torch.tanh(action)
         return action, log_prob
 
     def train_net(self, q1, q2, mini_batch):
         s, a, r, s_prime, done = mini_batch
         a_prime, log_prob = self.forward(s_prime)
-        entropy = -alpha * log_prob
+        entropy = -self.log_alpha.exp() * log_prob
 
         q1_val, q2_val = q1(s,a_prime), q2(s,a_prime)
         q1_q2 = torch.cat([q1_val, q2_val], dim=1)
@@ -77,6 +81,10 @@ class PolicyNet(nn.Module):
         loss.mean().backward()
         self.optimizer.step()
 
+        self.log_alpha_optimizer.zero_grad()
+        alpha_loss = -(self.log_alpha.exp() * (log_prob + target_entropy).detach()).mean()
+        alpha_loss.backward()
+        self.log_alpha_optimizer.step()
 
 class QNet(nn.Module):
     def __init__(self, learning_rate):
@@ -111,7 +119,7 @@ def calc_target(pi, q1, q2, mini_batch):
 
     with torch.no_grad():
         a_prime, log_prob= pi(s_prime)
-        entropy = -alpha * log_prob
+        entropy = -pi.log_alpha.exp() * log_prob
         q1_val, q2_val = q1(s_prime,a_prime), q2(s_prime,a_prime)
         q1_q2 = torch.cat([q1_val, q2_val], dim=1)
         min_q = torch.min(q1_q2, 1, keepdim=True)[0]
@@ -134,7 +142,7 @@ def main():
     for n_epi in range(10000):
         s = env.reset()
         done = False
-        
+
         while not done:
             a, log_prob= pi(torch.from_numpy(s).float())
             s_prime, r, done, info = env.step([a.item()])
@@ -148,12 +156,12 @@ def main():
                 td_target = calc_target(pi, q1_target, q2_target, mini_batch)
                 q1.train_net(td_target, mini_batch)
                 q2.train_net(td_target, mini_batch)
-                pi.train_net(q1, q2, mini_batch)
+                entropy = pi.train_net(q1, q2, mini_batch)
                 q1.soft_update(q1_target)
                 q2.soft_update(q2_target)
-
+                
         if n_epi%print_interval==0 and n_epi!=0:
-            print("# of episode :{}, avg score : {:.1f}".format(n_epi, score/print_interval))
+            print("# of episode :{}, avg score : {:.1f} alpha:{:.5f}".format(n_epi, score/print_interval, pi.log_alpha.exp()))
             score = 0.0
 
     env.close()
