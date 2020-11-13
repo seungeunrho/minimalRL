@@ -12,9 +12,9 @@ lr_pi           = 0.0005
 lr_q            = 0.001
 init_alpha     = 0.01
 gamma           = 0.98
-batch_size      = 32
+batch_size     = 32
 buffer_limit   = 50000
-tau              = 0.01 # for target network soft update
+tau             = 0.01 # for target network soft update
 target_entropy = -1.0 # for automated alpha update
 lr_alpha        = 0.001  # for automated alpha update
 
