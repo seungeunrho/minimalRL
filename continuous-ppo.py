@@ -66,7 +66,7 @@ class PPO(nn.Module):
         return s, a, r, s_prime, done_mask, prob_a
         
     def train_net(self):
-        s, a, r, s_prime, done_mask, prob_a = self.make_batch()
+        s, a, r, s_prime, done_mask, old_log_prob = self.make_batch()
         for i in range(K_epoch):
             td_target = r + gamma * self.v(s_prime) * done_mask
             delta = td_target - self.v(s)
@@ -80,18 +80,18 @@ class PPO(nn.Module):
             advantage_lst.reverse()
             advantage = torch.tensor(advantage_lst, dtype=torch.float)
 
-            new_mu,new_sigma = self.pi(s)
+            curr_mu,curr_sigma = self.pi(s)
             
-            pi_a_dist = torch.distributions.Normal(new_mu,new_sigma)
-            pi_a = pi_a_dist.log_prob(a)
-            entropy = pi_a_dist.entropy() * entropy_coef
+            curr_dist = torch.distributions.Normal(curr_mu,curr_sigma)
+            curr_log_prob = curr_dist.log_prob(a)
+            entropy = curr_dist.entropy() * entropy_coef
             
-            ratio = torch.exp(pi_a - prob_a.detach())
+            ratio = torch.exp(curr_log_prob - old_log_prob.detach())
             surr1 = ratio * advantage
             surr2 = torch.clamp(ratio, 1-eps_clip, 1+eps_clip) * advantage
-            loss_first = (-torch.min(surr1, surr2) - entropy).mean() 
-            loss_second = critic_coef * F.smooth_l1_loss(self.v(s).float() , td_target.detach().float())
-            loss = loss_first + loss_second
+            actor_loss = (-torch.min(surr1, surr2) - entropy).mean() 
+            critic_loss = critic_coef * F.smooth_l1_loss(self.v(s).float() , td_target.detach().float())
+            loss = actor_loss + critic_loss
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
@@ -118,11 +118,11 @@ def main(render = False):
                 dist = torch.distributions.Normal(mu,sigma)
                 
                 action = dist.sample()
-                old_log_prob = dist.log_prob(action)
+                log_prob = dist.log_prob(action)
                 s_prime, r, done, info = env.step([action.item()])
     
                 model.put_data((s, action, r/10.0, s_prime, \
-                                old_log_prob, done))
+                                log_prob, done))
                 s = s_prime
                 
                 score += r
