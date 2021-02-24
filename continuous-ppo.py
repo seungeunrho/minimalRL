@@ -7,11 +7,11 @@ import torch.optim as optim
 #Hyperparameters
 entropy_coef = 1e-2
 critic_coef = 1
-learning_rate = 0.0001
-gamma         = 0.98
-lmbda         = 0.95
-eps_clip      = 0.1
-K_epoch       = 3
+learning_rate = 0.0003
+gamma         = 0.9
+lmbda         = 0.9
+eps_clip      = 0.2
+K_epoch       = 10
 T_horizon     = 20
 
 
@@ -21,23 +21,25 @@ class PPO(nn.Module):
         self.data = []
         
         self.fc1   = nn.Linear(3,64)
-        self.fc_v  = nn.Linear(64,1)
-        self.fc_pi = nn.Linear(64,1)
-        self.fc_sigma = nn.Linear(64,1)
+        self.fc2   = nn.Linear(64,256)
+        self.fc_v  = nn.Linear(256,1)
+        self.fc_pi = nn.Linear(256,1)
+        self.fc_sigma = nn.Linear(256,1)
     
         
         self.optimizer = optim.Adam(self.parameters(), lr=learning_rate)
 
     def pi(self, x):
-        x = F.tanh(self.fc1(x))
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
         mu = 2 * F.tanh(self.fc_pi(x))
-        sigma = F.softplus(self.fc_sigma(x))
+        sigma = F.softplus(self.fc_sigma(x)) +1e-3
 
-        normal_list = torch.distributions.normal.Normal(loc=mu,scale=sigma)
-        return torch.clamp(normal_list.sample(),-2,2),mu,sigma
+        return mu,sigma
         
     def v(self, x):
-        x = F.tanh(self.fc1(x))
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
         v = self.fc_v(x)
         return v
       
@@ -66,7 +68,7 @@ class PPO(nn.Module):
     def train_net(self):
         s, a, r, s_prime, done_mask, prob_a = self.make_batch()
         for i in range(K_epoch):
-            td_target = r + gamma * self.v(s_prime) # * done_mask
+            td_target = r + gamma * self.v(s_prime) * done_mask
             delta = td_target - self.v(s)
             delta = delta.detach().numpy()
 
@@ -78,7 +80,7 @@ class PPO(nn.Module):
             advantage_lst.reverse()
             advantage = torch.tensor(advantage_lst, dtype=torch.float)
 
-            _,new_mu,new_sigma = self.pi(s)
+            new_mu,new_sigma = self.pi(s)
             
             pi_a_dist = torch.distributions.Normal(new_mu,new_sigma)
             pi_a = pi_a_dist.log_prob(a)
@@ -88,7 +90,7 @@ class PPO(nn.Module):
             surr1 = ratio * advantage
             surr2 = torch.clamp(ratio, 1-eps_clip, 1+eps_clip) * advantage
             loss_first = (-torch.min(surr1, surr2) - entropy).mean() 
-            loss_second = critic_coef * F.smooth_l1_loss(self.v(s) , td_target.detach())
+            loss_second = critic_coef * F.smooth_l1_loss(self.v(s).float() , td_target.detach().float())
             loss = loss_first + loss_second
             self.optimizer.zero_grad()
             loss.backward()
@@ -98,7 +100,7 @@ class PPO(nn.Module):
 env = gym.make('Pendulum-v0')
 model = PPO()
 
-print_interval = 10
+print_interval = 20
 
 def main(render = False):
     score = 0.0
@@ -112,12 +114,14 @@ def main(render = False):
                 global_step += 1 
                 if render:    
                     env.render()
-                prob,mu,sigma = model.pi(torch.from_numpy(s).float())
-                old_log_prob = torch.distributions.Normal(mu,sigma).log_prob(prob).detach().item()
-                action = prob.item()
-                s_prime, r, done, info = env.step([action])
+                mu,sigma = model.pi(torch.from_numpy(s).float())
+                dist = torch.distributions.Normal(mu,sigma)
+                
+                action = dist.sample()
+                old_log_prob = dist.log_prob(action)
+                s_prime, r, done, info = env.step([action.item()])
     
-                model.put_data((s, action, r/100.0, s_prime, \
+                model.put_data((s, action, r/10.0, s_prime, \
                                 old_log_prob, done))
                 s = s_prime
                 
