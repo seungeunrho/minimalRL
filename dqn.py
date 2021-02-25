@@ -42,12 +42,14 @@ class ReplayBuffer():
 class Qnet(nn.Module):
     def __init__(self):
         super(Qnet, self).__init__()
-        self.fc1 = nn.Linear(4, 256)
-        self.fc2 = nn.Linear(256, 2)
+        self.fc1 = nn.Linear(4, 128)
+        self.fc2 = nn.Linear(128, 128)
+        self.fc3 = nn.Linear(128, 2)
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
-        x = self.fc2(x)
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
         return x
       
     def sample_action(self, obs, epsilon):
@@ -86,8 +88,9 @@ def main():
     for n_epi in range(10000):
         epsilon = max(0.01, 0.08 - 0.01*(n_epi/200)) #Linear annealing from 8% to 1%
         s = env.reset()
+        done = False
 
-        for t in range(600):
+        while not done:
             a = q.sample_action(torch.from_numpy(s).float(), epsilon)      
             s_prime, r, done, info = env.step(a)
             done_mask = 0.0 if done else 1.0
@@ -103,7 +106,7 @@ def main():
 
         if n_epi%print_interval==0 and n_epi!=0:
             q_target.load_state_dict(q.state_dict())
-            print("# of episode :{}, avg score : {:.1f}, buffer size : {}, epsilon : {:.1f}%".format(
+            print("n_episode :{}, score : {:.1f}, n_buffer : {}, eps : {:.1f}%".format(
                                                             n_epi, score/print_interval, memory.size(), epsilon*100))
             score = 0.0
     env.close()

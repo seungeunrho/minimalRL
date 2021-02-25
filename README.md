@@ -17,11 +17,13 @@ Implementations of basic RL algorithms with minimal lines of codes! (PyTorch bas
 2. [Vanilla Actor-Critic](https://github.com/seungeunrho/minimalRL/blob/master/actor_critic.py) (98 lines)
 3. [DQN](https://github.com/seungeunrho/minimalRL/blob/master/dqn.py) (112 lines,  including replay memory and target network)
 4. [PPO](https://github.com/seungeunrho/minimalRL/blob/master/ppo.py) (119 lines,  including GAE)
-5. [DDPG](https://github.com/seungeunrho/minimalRL/blob/master/ddpg.py) (147 lines, including OU noise and soft target update)
+5. [DDPG](https://github.com/seungeunrho/minimalRL/blob/master/ddpg.py) (145 lines, including OU noise and soft target update)
 6. [A3C](https://github.com/seungeunrho/minimalRL/blob/master/a3c.py) (129 lines)
 7. [ACER](https://github.com/seungeunrho/minimalRL/blob/master/acer.py) (149 lines)
-8. [A2C](https://github.com/seungeunrho/minimalRL/blob/master/a2c.py) added! (188 lines)
-9. Any suggestion ..?
+8. [A2C](https://github.com/seungeunrho/minimalRL/blob/master/a2c.py) (188 lines)
+9. [SAC](https://github.com/seungeunrho/minimalRL/blob/master/sac.py) (171 lines) added!! 
+10. [PPO-Continuous](https://github.com/seungeunrho/minimalRL/blob/master/ppo-continuous.py) (161 lines) added!!
+11. Any suggestion ...? 
 
 
 ## Dependencies
@@ -40,4 +42,5 @@ python3 ddpg.py
 python3 a3c.py
 python3 a2c.py
 python3 acer.py
+python3 sac.py
 ```

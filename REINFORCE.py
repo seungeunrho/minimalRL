@@ -28,12 +28,12 @@ class Policy(nn.Module):
         
     def train_net(self):
         R = 0
-        for r, log_prob in self.data[::-1]:
+        self.optimizer.zero_grad()
+        for r, prob in self.data[::-1]:
             R = r + gamma * R
-            loss = -log_prob * R
-            self.optimizer.zero_grad()
+            loss = -torch.log(prob) * R
             loss.backward()
-            self.optimizer.step()
+        self.optimizer.step()
         self.data = []
 
 def main():
@@ -42,20 +42,20 @@ def main():
     score = 0.0
     print_interval = 20
     
+    
     for n_epi in range(10000):
         s = env.reset()
-        for t in range(501): # CartPole-v1 forced to terminates at 500 step.
+        done = False
+        
+        while not done: # CartPole-v1 forced to terminates at 500 step.
             prob = pi(torch.from_numpy(s).float())
             m = Categorical(prob)
             a = m.sample()
             s_prime, r, done, info = env.step(a.item())
-            pi.put_data((r,torch.log(prob[a])))
-            
+            pi.put_data((r,prob[a]))
             s = s_prime
             score += r
-            if done:
-                break
-
+            
         pi.train_net()
         
         if n_epi%print_interval==0 and n_epi!=0:
