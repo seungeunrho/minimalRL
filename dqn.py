@@ -82,12 +82,13 @@ def main():
     memory = ReplayBuffer()
 
     print_interval = 20
-    score = 0.0  
+    
     optimizer = optim.Adam(q.parameters(), lr=learning_rate)
 
     for n_epi in range(10000):
         epsilon = max(0.01, 0.08 - 0.01*(n_epi/200)) #Linear annealing from 8% to 1%
         s = env.reset()
+        score = 0.0
         done = False
 
         while not done:
