@@ -12,13 +12,15 @@ import torch.optim as optim
 # Hyperparameters
 learning_rate = 0.0005
 gamma = 0.98
-buffer_limit = 50000
+buffer_limit = 100
 batch_size = 32
-cell_size = 64
-sequence_length = 20
-over_lapping_length = 10
-burn_in_length = 10
-Transition = namedtuple('Transition', ('state', 'next_state', 'action', 'reward', 'mask', 'rnn_state'))
+cell_size = 16
+sequence_length = 10
+over_lapping_length = 5
+burn_in_length = 3
+Transition = namedtuple('Transition',
+                        ('state', 'next_state', 'action', 'reward', 'mask', 'rnn_state', 'target_rnn_state'))
+
 
 class Qnet(nn.Module):
     def __init__(self, num_inputs=4, num_outputs=2):
@@ -26,17 +28,20 @@ class Qnet(nn.Module):
         self.num_inputs = num_inputs
         self.num_outputs = num_outputs
 
-        self.lstm = nn.LSTM(input_size=num_inputs, hidden_size=16, batch_first=True)
-        self.fc1 = nn.Linear(16, 32)
+        self.lstm = nn.LSTM(input_size=num_inputs, hidden_size=cell_size, batch_first=True)
+        self.fc1 = nn.Linear(cell_size, 32)
         self.fc2 = nn.Linear(32, num_outputs)
 
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform(m.weight)
+
     def forward(self, x, hidden=None):
-        # [batch_size, sequence_length, num_inputs]
         if len(x.shape) == 1:
             batch_size = 1
             sequence_length = 1
             x = x.view(batch_size, sequence_length, -1)
-        else:
+        else:  # [batch_size, sequence_length, num_inputs]
             batch_size = x.size()[0]
             sequence_length = x.size()[1]
         out, hidden = self.lstm(x, hidden)
@@ -53,15 +58,17 @@ class LocalBuffer(object):
         self.memory = []
         self.over_lapping_from_prev = []
 
-    def push(self, state, next_state, action, reward, mask, rnn_state):
+    def push(self, state, next_state, action, reward, mask, rnn_state, target_rnn_state):
         self.local_memory.append(
-            Transition(state, next_state, action, reward, mask, torch.stack(rnn_state).view(2, -1)))
+            Transition(state, next_state, action, reward, mask, torch.stack(rnn_state).view(2, -1),
+                       torch.stack(target_rnn_state).view(2, -1)))
         if (len(self.local_memory) + len(self.over_lapping_from_prev)) == sequence_length or mask == 0:
             self.local_memory = self.over_lapping_from_prev + self.local_memory
             length = len(self.local_memory)
             while len(self.local_memory) < sequence_length:  # zero padding to standardize length of the each experience
-                self.local_memory.append(Transition(torch.tensor([.0, .0, .0, .0], dtype=torch.float), torch.tensor([.0, .0, .0, .0], dtype=torch.float), 0, 0, 0,
-                                                    torch.zeros([2, 1, 16]).view(2, -1)))  # rnn state = [(hidden,cell), seq_, dim]
+                self.local_memory.append(Transition(torch.tensor([.0, .0, .0, .0], dtype=torch.float),
+                                                    torch.tensor([.0, .0, .0, .0], dtype=torch.float), 0, 0, 0,
+                                                    torch.zeros([2, 1, cell_size]).view(2, -1), torch.zeros([2, 1, cell_size]).view(2, -1)))  # rnn state = [(hidden,cell), seq_, dim]
             self.memory.append([self.local_memory, length])  # length tells true length of the memory
             if mask == 0:
                 self.over_lapping_from_prev = []
@@ -71,7 +78,7 @@ class LocalBuffer(object):
 
     def get(self):
         episodes = self.memory
-        batch_state, batch_next_state, batch_action, batch_reward, batch_mask, batch_rnn_state = [], [], [], [], [], []
+        batch_state, batch_next_state, batch_action, batch_reward, batch_mask, batch_rnn_state, batch_target_rnn_state = [], [], [], [], [], [], []
         lengths = []
         for episode, length in episodes:
             batch = Transition(*zip(*episode))
@@ -82,11 +89,12 @@ class LocalBuffer(object):
             batch_reward.append(torch.tensor(list(batch.reward)))
             batch_mask.append(torch.tensor(list(batch.mask)))
             batch_rnn_state.append(torch.stack(list(batch.rnn_state)))
+            batch_target_rnn_state.append(torch.stack(list(batch.target_rnn_state)))
             lengths.append(length)
 
         self.memory = []
         return Transition(batch_state, batch_next_state, batch_action, batch_reward, batch_mask,
-                          batch_rnn_state), lengths
+                          batch_rnn_state, batch_target_rnn_state), lengths
 
 
 class Memory(object):
@@ -99,14 +107,14 @@ class Memory(object):
     def put(self, batch, lengths):
         for i in range(len(batch)):
             self.memory.append([Transition(batch.state[i], batch.next_state[i], batch.action[i], batch.reward[i],
-                                           batch.mask[i], batch.rnn_state[i]), lengths[i]])
+                                           batch.mask[i], batch.rnn_state[i], batch.target_rnn_state[i]), lengths[i]])
 
     def sample(self, batch_size):
         indexes = np.random.choice(range(len(self.memory)), batch_size)
         episodes = [self.memory[idx][0] for idx in indexes]
         lengths = [self.memory[idx][1] for idx in indexes]
 
-        batch_state, batch_next_state, batch_action, batch_reward, batch_mask, batch_step, batch_rnn_state = [], [], [], [], [], [], []
+        batch_state, batch_next_state, batch_action, batch_reward, batch_mask, batch_rnn_state, batch_target_rnn_state = [], [], [], [], [], [], []
         for episode in episodes:
             batch_state.append(episode.state)
             batch_next_state.append(episode.next_state)
@@ -114,9 +122,10 @@ class Memory(object):
             batch_reward.append(episode.reward)
             batch_mask.append(episode.mask)
             batch_rnn_state.append(episode.rnn_state)
+            batch_target_rnn_state.append(episode.target_rnn_state)
 
         return Transition(batch_state, batch_next_state, batch_action, batch_reward, batch_mask,
-                          batch_rnn_state), indexes, lengths
+                          batch_rnn_state, batch_target_rnn_state), indexes, lengths
 
 
 def learner_process(model, target_model, exp_q, lock):
@@ -138,7 +147,8 @@ class Learner:
         while True:
             if self.share_exp_mem.size() > batch_size:
                 batch, indexes, lengths = self.share_exp_mem.sample(batch_size)
-                self.train(batch, lengths)
+                for _ in range(8):
+                    self.train(batch, lengths)
                 self.n_epochs += 1
                 if self.n_epochs % 5 == 0:
                     self.q_target.load_state_dict(self.q.state_dict())
@@ -154,19 +164,23 @@ class Learner:
         rewards = torch.stack(batch.reward).view(batch_size, sequence_length, -1)
         masks = torch.stack(batch.mask).view(batch_size, sequence_length, -1)
         rnn_state = torch.stack(batch.rnn_state).view(batch_size, sequence_length, 2, -1)
+        target_rnn_state = torch.stack(batch.target_rnn_state).view(batch_size, sequence_length, 2, -1)
 
         [h0, c0] = rnn_state[:, 0, :, :].transpose(0, 1)  # the first hidden state among sequence_length
         h0 = h0.unsqueeze(0).detach()
         c0 = c0.unsqueeze(0).detach()
 
-        [h1, c1] = rnn_state[:, 1, :, :].transpose(0, 1)  # the second hidden state among sequence_length
+        [h1, c1] = rnn_state[:, 0, :, :].transpose(0, 1)  # the first hidden state among sequence_length
         h1 = h1.unsqueeze(0).detach()
         c1 = c1.unsqueeze(0).detach()
 
-        pred, _ = self.q(states, (h0, c0))
-        next_pred, _ = self.q_target(next_states, (h1, c1))
+        [target_h1, target_c1] = target_rnn_state[:, 1, :, :].transpose(0, 1)  # the second hidden state among sequence_length
+        target_h1 = target_h1.unsqueeze(0).detach()
+        target_c1 = target_c1.unsqueeze(0).detach()
 
+        pred, _ = self.q(states, (h0, c0))
         next_pred_online, _ = self.q(next_states, (h1, c1))
+        next_pred, _ = self.q_target(next_states, (target_h1, target_c1))
 
         pred = slice_burn_in(pred)
         next_pred = slice_burn_in(next_pred)
@@ -175,17 +189,12 @@ class Learner:
         masks = slice_burn_in(masks)
         next_pred_online = slice_burn_in(next_pred_online)
 
-        pred = pred.gather(2, actions)
-
+        pred = pred.gather(2, actions)  # [batch_size, seq_len - burn_in_length, num_outputs]
         _, next_pred_online_action = next_pred_online.max(2)
-
         target = rewards + masks * gamma * next_pred.gather(2, next_pred_online_action.unsqueeze(2))
-
         td_error = pred - target.detach()
-
         for idx, length in enumerate(lengths):
             td_error[idx][length - burn_in_length:][:] = 0
-
         loss = pow(td_error, 2).mean()
 
         self.optimizer.zero_grad()
@@ -207,7 +216,6 @@ class Actor:
         self.local_buffer = LocalBuffer()
         self.q = model
         self.q_target = target_model
-        self.net_load_interval = 10
         self.overlap_length = 5
 
         self.share_exp_mem = share_exp_mem
@@ -216,34 +224,32 @@ class Actor:
     def run(self):
         for e in range(30000):
             done = False
-
             score = 0
             state = self.env.reset()
             state = torch.tensor(state, dtype=torch.float)
-            hidden = (torch.zeros(1, 1, 16), torch.zeros(1, 1, 16))
+            target_hidden = hidden = (torch.zeros(1, 1, cell_size), torch.zeros(1, 1, cell_size))
 
             while not done:
                 epsilon = max(0.01, self.epsilon - 0.01 * (e / 200))  # Linear annealing from 8% to 1%
                 with torch.no_grad():
                     q_value, new_hidden = self.q(state)
-                    target_q_value, target_new_hidden = self.q_target(state)  #todo : replay 에 target hidden 도 넣어야 할텐데..?
+                    _, target_new_hidden = self.q_target(state)
                 if random.random() < epsilon:
                     action = random.randint(0, 1)
                 else:
                     action = q_value.argmax().item()
 
                 next_state, reward, done, _ = self.env.step(action)
-
-                # next_state = state_to_partial_observability(next_state)
                 next_state = torch.tensor(next_state, dtype=torch.float)
 
                 mask = 0 if done else 1
-                self.local_buffer.push(state, next_state, action, reward, mask,
-                                       hidden)  # todo : target_hidden 은 저장 안하나?
+                self.local_buffer.push(state, next_state, action, reward, mask, hidden, target_hidden)
                 hidden = new_hidden
+                target_hidden = target_new_hidden
+
                 if len(self.local_buffer.memory) == batch_size:
                     batch, lengths = self.local_buffer.get()
-                    # memory.push(td_error, batch, lengths)
+
                     self.lock.acquire()
                     self.share_exp_mem.put(batch, lengths)
                     self.lock.release()
@@ -257,28 +263,29 @@ class Actor:
 
 def main():
     model = Qnet()
+    model.share_memory()
+
     target_model = Qnet()
     target_model.load_state_dict(model.state_dict())
-    model.share_memory()
     target_model.share_memory()
 
     mp.Manager().register('Memory', Memory)
     manager = mp.Manager()
     experience_memory = manager.Memory()
 
-    l = mp.Lock()
+    lock = mp.Lock()
 
     # learner process
     processes = [mp.Process(
         target=learner_process,
-        args=(model, target_model, experience_memory, l))]
+        args=(model, target_model, experience_memory, lock))]
 
     # actor process
     n_actors = 2
     for actor_id in range(n_actors):
         processes.append(mp.Process(
             target=actor_process,
-            args=(actor_id, n_actors, model, target_model, experience_memory, l)))
+            args=(actor_id, n_actors, model, target_model, experience_memory, lock)))
 
     for i in range(len(processes)):
         processes[i].start()
