@@ -23,7 +23,8 @@ Implementations of basic RL algorithms with minimal lines of codes! (PyTorch bas
 8. [A2C](https://github.com/seungeunrho/minimalRL/blob/master/a2c.py) (188 lines)
 9. [SAC](https://github.com/seungeunrho/minimalRL/blob/master/sac.py) (171 lines) added!! 
 10. [PPO-Continuous](https://github.com/seungeunrho/minimalRL/blob/master/ppo-continuous.py) (161 lines) added!!
-11. Any suggestion ...? 
+11. [Vtrace](https://github.com/seungeunrho/minimalRL/blob/master/vtrace.py) (137 lines) added!!
+12. Any suggestion ...? 
 
 
 ## Dependencies
