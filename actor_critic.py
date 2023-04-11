@@ -35,22 +35,22 @@ class ActorCritic(nn.Module):
         self.data.append(transition)
         
     def make_batch(self):
-        s_lst, a_lst, r_lst, s_prime_lst, done_lst = [], [], [], [], []
-        for transition in self.data:
-            s,a,r,s_prime,done = transition
-            s_lst.append(s)
-            a_lst.append([a])
-            r_lst.append([r/100.0])
-            s_prime_lst.append(s_prime)
-            done_mask = 0.0 if done else 1.0
-            done_lst.append([done_mask])
-        
-        s_batch, a_batch, r_batch, s_prime_batch, done_batch = torch.tensor(s_lst, dtype=torch.float), torch.tensor(a_lst), \
-                                                               torch.tensor(r_lst, dtype=torch.float), torch.tensor(s_prime_lst, dtype=torch.float), \
-                                                               torch.tensor(done_lst, dtype=torch.float)
+        transposed_data = list(map(list, zip(*self.data)))
+        s_lst = transposed_data[0]
+        a_lst = list(map(lambda x: [x], transposed_data[1]))
+        r_lst = list(map(lambda x: [x/100.0], transposed_data[2]))
+        s_prime_lst = transposed_data[3]
+        done_lst = list(map(lambda x: [0.0] if x else [1.0], transposed_data[4]))
+
+        s_batch = torch.tensor(s_lst, dtype=torch.float)
+        a_batch = torch.tensor(a_lst)
+        r_batch = torch.tensor(r_lst, dtype=torch.float)
+        s_prime_batch = torch.tensor(s_prime_lst, dtype=torch.float)
+        done_batch = torch.tensor(done_lst, dtype=torch.float)
+
         self.data = []
         return s_batch, a_batch, r_batch, s_prime_batch, done_batch
-  
+
     def train_net(self):
         s, a, r, s_prime, done = self.make_batch()
         td_target = r + gamma * self.v(s_prime) * done
@@ -61,8 +61,9 @@ class ActorCritic(nn.Module):
         loss = -torch.log(pi_a) * delta.detach() + F.smooth_l1_loss(self.v(s), td_target.detach())
 
         self.optimizer.zero_grad()
-        loss.mean().backward()
-        self.optimizer.step()         
+        loss = loss.mean()
+        loss.backward()
+        self.optimizer.step()       
       
 def main():  
     env = gym.make('CartPole-v1')
@@ -72,13 +73,13 @@ def main():
 
     for n_epi in range(10000):
         done = False
-        s = env.reset()
+        s = env.reset()[0]
         while not done:
             for t in range(n_rollout):
                 prob = model.pi(torch.from_numpy(s).float())
                 m = Categorical(prob)
                 a = m.sample().item()
-                s_prime, r, done, info = env.step(a)
+                s_prime, r, done, info, _ = env.step(a)
                 model.put_data((s,a,r,s_prime,done))
                 
                 s = s_prime

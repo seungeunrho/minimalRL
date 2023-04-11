@@ -1,6 +1,7 @@
 import gym
 import collections
 import random
+import numpy as np
 
 import torch
 import torch.nn as nn
@@ -27,14 +28,17 @@ class ReplayBuffer():
         for transition in mini_batch:
             s, a, r, s_prime, done_mask = transition
             s_lst.append(s)
-            a_lst.append([a])
+            a_lst.append([a])  
             r_lst.append([r])
             s_prime_lst.append(s_prime)
             done_mask_lst.append([done_mask])
 
-        return torch.tensor(s_lst, dtype=torch.float), torch.tensor(a_lst), \
-               torch.tensor(r_lst), torch.tensor(s_prime_lst, dtype=torch.float), \
-               torch.tensor(done_mask_lst)
+        return (torch.tensor(np.array(s_lst), dtype=torch.float),
+                torch.tensor(np.array(a_lst), dtype=torch.int64), 
+                torch.tensor(np.array(r_lst), dtype=torch.float),
+                torch.tensor(np.array(s_prime_lst), dtype=torch.float),
+                torch.tensor(np.array(done_mask_lst), dtype=torch.float))
+
     
     def size(self):
         return len(self.buffer)
@@ -87,12 +91,12 @@ def main():
 
     for n_epi in range(10000):
         epsilon = max(0.01, 0.08 - 0.01*(n_epi/200)) #Linear annealing from 8% to 1%
-        s = env.reset()
+        s = env.reset()[0]
         done = False
 
         while not done:
             a = q.sample_action(torch.from_numpy(s).float(), epsilon)      
-            s_prime, r, done, info = env.step(a)
+            s_prime, r, done, info, _ = env.step(a)
             done_mask = 0.0 if done else 1.0
             memory.put((s,a,r/100.0,s_prime, done_mask))
             s = s_prime

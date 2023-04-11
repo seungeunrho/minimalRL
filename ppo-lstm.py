@@ -49,7 +49,7 @@ class PPO(nn.Module):
         s_lst, a_lst, r_lst, s_prime_lst, prob_a_lst, h_in_lst, h_out_lst, done_lst = [], [], [], [], [], [], [], []
         for transition in self.data:
             s, a, r, s_prime, prob_a, h_in, h_out, done = transition
-            
+
             s_lst.append(s)
             a_lst.append([a])
             r_lst.append([r])
@@ -59,12 +59,14 @@ class PPO(nn.Module):
             h_out_lst.append(h_out)
             done_mask = 0 if done else 1
             done_lst.append([done_mask])
-            
-        s,a,r,s_prime,done_mask,prob_a = torch.tensor(s_lst, dtype=torch.float), torch.tensor(a_lst), \
-                                         torch.tensor(r_lst), torch.tensor(s_prime_lst, dtype=torch.float), \
-                                         torch.tensor(done_lst, dtype=torch.float), torch.tensor(prob_a_lst)
+
+        s, r, s_prime, prob_a, done_mask = map(torch.from_numpy, 
+                                                [np.stack(s_lst), np.stack(r_lst), 
+                                                 np.stack(s_prime_lst), np.stack(prob_a_lst), np.stack(done_lst)])
+        a = torch.tensor(a_lst)
+
         self.data = []
-        return s,a,r,s_prime, done_mask, prob_a, h_in_lst[0], h_out_lst[0]
+        return s, a, r, s_prime, done_mask, prob_a, h_in_lst[0], h_out_lst[0]
         
     def train_net(self):
         s,a,r,s_prime,done_mask, prob_a, (h1_in, h2_in), (h1_out, h2_out) = self.make_batch()
@@ -106,7 +108,7 @@ def main():
     
     for n_epi in range(10000):
         h_out = (torch.zeros([1, 1, 32], dtype=torch.float), torch.zeros([1, 1, 32], dtype=torch.float))
-        s = env.reset()
+        s = env.reset()[0]
         done = False
         
         while not done:
@@ -116,8 +118,7 @@ def main():
                 prob = prob.view(-1)
                 m = Categorical(prob)
                 a = m.sample().item()
-                s_prime, r, done, info = env.step(a)
-
+                s_prime, r, done, info, _ = env.step(a)
                 model.put_data((s, a, r/100.0, s_prime, prob[a].item(), h_in, h_out, done))
                 s = s_prime
 

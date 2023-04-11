@@ -44,8 +44,7 @@ class Vtrace(nn.Module):
     def make_batch(self):
         s_lst, a_lst, r_lst, s_prime_lst, mu_a_lst, done_lst = [], [], [], [], [], []
         for transition in self.data:
-            s, a, r, s_prime, mu_a, done = transition
-            
+            s, a, r, s_prime, mu_a, done, info = transition 
             s_lst.append(s)
             a_lst.append([a])
             r_lst.append([r])
@@ -53,11 +52,14 @@ class Vtrace(nn.Module):
             mu_a_lst.append([mu_a])
             done_mask = 0 if done else 1
             done_lst.append([done_mask])
-            
-        s,a,r,s_prime,done_mask, mu_a = torch.tensor(s_lst, dtype=torch.float), torch.tensor(a_lst), \
-                                        torch.tensor(r_lst), torch.tensor(s_prime_lst, dtype=torch.float), \
-                                        torch.tensor(done_lst, dtype=torch.float), torch.tensor(mu_a_lst)
+
+        s, r, s_prime, mu_a, done_mask = map(torch.from_numpy, 
+                                            [np.stack(s_lst), np.stack(r_lst), 
+                                             np.stack(s_prime_lst), np.stack(mu_a_lst), np.stack(done_lst)])
+        a = torch.tensor(a_lst)
+
         self.data = []
+
         return s, a, r, s_prime, done_mask, mu_a
 
     def vtrace(self, s, a, r, s_prime, done_mask, mu_a):
@@ -109,16 +111,16 @@ def main():
     score = 0.0
     
     for n_epi in range(10000):
-        s = env.reset()
+        s = env.reset()[0]
         done = False
         while not done:
             for t in range(T_horizon):
                 prob = model.pi(torch.from_numpy(s).float())
                 m = Categorical(prob)
                 a = m.sample().item()
-                s_prime, r, done, info = env.step(a)
+                s_prime, r, done, info, _ = env.step(a)
 
-                model.put_data((s, a, r/100.0, s_prime, prob[a].item(), done))
+                model.put_data((s, a, r/100.0, s_prime, prob[a].item(), done, info))
                 s = s_prime
 
                 score += r

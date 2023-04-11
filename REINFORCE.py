@@ -44,14 +44,14 @@ def main():
     
     
     for n_epi in range(10000):
-        s = env.reset()
+        s = env.reset()[0]
         done = False
         
         while not done: # CartPole-v1 forced to terminates at 500 step.
             prob = pi(torch.from_numpy(s).float())
             m = Categorical(prob)
             a = m.sample()
-            s_prime, r, done, info = env.step(a.item())
+            s_prime, r, done, info, _ = env.step(a.item())
             pi.put_data((r,prob[a]))
             s = s_prime
             score += r

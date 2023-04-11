@@ -1,6 +1,7 @@
 import gym
 import random
 import collections
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -34,7 +35,7 @@ class ReplayBuffer():
 
         s_lst, a_lst, r_lst, prob_lst, done_lst, is_first_lst = [], [], [], [], [], []
         for seq in mini_batch:
-            is_first = True  # Flag for indicating whether the transition is the first item from a sequence
+            is_first = True 
             for transition in seq:
                 s, a, r, prob, done = transition
 
@@ -47,9 +48,19 @@ class ReplayBuffer():
                 is_first_lst.append(is_first)
                 is_first = False
 
-        s,a,r,prob,done_mask,is_first = torch.tensor(s_lst, dtype=torch.float), torch.tensor(a_lst), \
-                                        r_lst, torch.tensor(prob_lst, dtype=torch.float), done_lst, \
-                                        is_first_lst
+        s_np = np.float32(s_lst)
+        a_np = np.int64(a_lst)
+        r_np = np.float32(r_lst)
+        prob_np = np.float32(prob_lst)
+        done_mask_np = np.float32(done_lst)
+        is_first_np = np.float32(is_first_lst)
+
+        s = torch.tensor(s_np)
+        a = torch.tensor(a_np, dtype=torch.int64)
+        r = torch.tensor(r_np)
+        prob = torch.tensor(prob_np)
+        done_mask = torch.tensor(done_mask_np)
+        is_first = torch.tensor(is_first_np)
         return s,a,r,prob,done_mask,is_first
     
     def size(self):
@@ -118,7 +129,7 @@ def main():
     print_interval = 20    
 
     for n_epi in range(10000):
-        s = env.reset()
+        s = env.reset()[0]
         done = False
         
         while not done:
@@ -126,7 +137,7 @@ def main():
             for t in range(rollout_len): 
                 prob = model.pi(torch.from_numpy(s).float())
                 a = Categorical(prob).sample().item()
-                s_prime, r, done, info = env.step(a)
+                s_prime, r, done, info, _ = env.step(a)
                 seq_data.append((s, a, r/100.0, prob.detach().numpy(), done))
 
                 score +=r
