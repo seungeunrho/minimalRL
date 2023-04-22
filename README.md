@@ -29,7 +29,7 @@ Implementations of basic RL algorithms with minimal lines of codes! (PyTorch bas
 
 ## Dependencies
 1. PyTorch
-2. OpenAI GYM
+2. OpenAI GYM ( > 0.26.2 IMPORTANT!! No longer support for the previous versions)
 
 ## Usage
 ```bash
