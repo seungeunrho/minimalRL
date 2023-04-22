@@ -129,7 +129,7 @@ def calc_target(pi, q1, q2, mini_batch):
     return target
     
 def main():
-    env = gym.make('Pendulum-v0')
+    env = gym.make('Pendulum-v1')
     memory = ReplayBuffer()
     q1, q2, q1_target, q2_target = QNet(lr_q), QNet(lr_q), QNet(lr_q), QNet(lr_q)
     pi = PolicyNet(lr_pi)
@@ -141,15 +141,17 @@ def main():
     print_interval = 20
 
     for n_epi in range(10000):
-        s = env.reset()
+        s, _ = env.reset()
         done = False
+        count = 0
 
-        while not done:
+        while count < 200 and not done:
             a, log_prob= pi(torch.from_numpy(s).float())
-            s_prime, r, done, info = env.step([2.0*a.item()])
+            s_prime, r, done, truncated, info = env.step([2.0*a.item()])
             memory.put((s, a.item(), r/10.0, s_prime, done))
             score +=r
             s = s_prime
+            count += 1
                 
         if memory.size()>1000:
             for i in range(20):

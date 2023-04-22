@@ -118,7 +118,7 @@ def main():
     print_interval = 20    
 
     for n_epi in range(10000):
-        s = env.reset()
+        s, _ = env.reset()
         done = False
         
         while not done:
@@ -126,7 +126,7 @@ def main():
             for t in range(rollout_len): 
                 prob = model.pi(torch.from_numpy(s).float())
                 a = Categorical(prob).sample().item()
-                s_prime, r, done, info = env.step(a)
+                s_prime, r, done, truncated, info = env.step(a)
                 seq_data.append((s, a, r/100.0, prob.detach().numpy(), done))
 
                 score +=r

@@ -106,7 +106,7 @@ def main():
     
     for n_epi in range(10000):
         h_out = (torch.zeros([1, 1, 32], dtype=torch.float), torch.zeros([1, 1, 32], dtype=torch.float))
-        s = env.reset()
+        s, _ = env.reset()
         done = False
         
         while not done:
@@ -116,7 +116,7 @@ def main():
                 prob = prob.view(-1)
                 m = Categorical(prob)
                 a = m.sample().item()
-                s_prime, r, done, info = env.step(a)
+                s_prime, r, done, truncated, info = env.step(a)
 
                 model.put_data((s, a, r/100.0, s_prime, prob[a].item(), h_in, h_out, done))
                 s = s_prime

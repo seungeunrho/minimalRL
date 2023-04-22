@@ -4,7 +4,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.distributions import Normal
-import numpy as np
 
 #Hyperparameters
 learning_rate  = 0.0003
@@ -13,7 +12,7 @@ lmbda           = 0.9
 eps_clip        = 0.2
 K_epoch         = 10
 rollout_len    = 3
-buffer_size    = 30
+buffer_size    = 10
 minibatch_size = 32
 
 class PPO(nn.Module):
@@ -122,22 +121,23 @@ class PPO(nn.Module):
                     self.optimization_step += 1
         
 def main():
-    env = gym.make('Pendulum-v0')
+    env = gym.make('Pendulum-v1')
     model = PPO()
     score = 0.0
     print_interval = 20
     rollout = []
 
     for n_epi in range(10000):
-        s = env.reset()
+        s, _ = env.reset()
         done = False
-        while not done:
+        count = 0
+        while count < 200 and not done:
             for t in range(rollout_len):
                 mu, std = model.pi(torch.from_numpy(s).float())
                 dist = Normal(mu, std)
                 a = dist.sample()
                 log_prob = dist.log_prob(a)
-                s_prime, r, done, info = env.step([a.item()])
+                s_prime, r, done, truncated, info = env.step([a.item()])
 
                 rollout.append((s, a, r/10.0, s_prime, log_prob.item(), done))
                 if len(rollout) == rollout_len:
@@ -146,13 +146,12 @@ def main():
 
                 s = s_prime
                 score += r
-                if done:
-                    break
+                count += 1
 
             model.train_net()
 
         if n_epi%print_interval==0 and n_epi!=0:
-            print("# of episode :{}, avg score : {:.1f}, opt step: {}".format(n_epi, score/print_interval, model.optimization_step))
+            print("# of episode :{}, avg score : {:.1f}, optmization step: {}".format(n_epi, score/print_interval, model.optimization_step))
             score = 0.0
 
     env.close()

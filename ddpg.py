@@ -102,7 +102,7 @@ def soft_update(net, net_target):
         param_target.data.copy_(param_target.data * (1.0 - tau) + param.data * tau)
     
 def main():
-    env = gym.make('Pendulum-v0')
+    env = gym.make('Pendulum-v1', max_episode_steps=200, autoreset=True)
     memory = ReplayBuffer()
 
     q, q_target = QNet(), QNet()
@@ -118,16 +118,18 @@ def main():
     ou_noise = OrnsteinUhlenbeckNoise(mu=np.zeros(1))
 
     for n_epi in range(10000):
-        s = env.reset()
+        s, _ = env.reset()
         done = False
-        
-        while not done:
+
+        count = 0
+        while count < 200 and not done:
             a = mu(torch.from_numpy(s).float()) 
             a = a.item() + ou_noise()[0]
-            s_prime, r, done, info = env.step([a])
+            s_prime, r, done, truncated, info = env.step([a])
             memory.put((s,a,r/100.0,s_prime,done))
             score +=r
             s = s_prime
+            count += 1
                 
         if memory.size()>2000:
             for i in range(10):

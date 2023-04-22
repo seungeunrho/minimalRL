@@ -91,14 +91,14 @@ def main():
     print_interval = 20
 
     for n_epi in range(10000):
-        s = env.reset()
+        s, _ = env.reset()
         done = False
         while not done:
             for t in range(T_horizon):
                 prob = model.pi(torch.from_numpy(s).float())
                 m = Categorical(prob)
                 a = m.sample().item()
-                s_prime, r, done, info = env.step(a)
+                s_prime, r, done, truncated, info = env.step(a)
 
                 model.put_data((s, a, r/100.0, s_prime, prob[a].item(), done))
                 s = s_prime

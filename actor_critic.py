@@ -72,13 +72,13 @@ def main():
 
     for n_epi in range(10000):
         done = False
-        s = env.reset()
+        s, _ = env.reset()
         while not done:
             for t in range(n_rollout):
                 prob = model.pi(torch.from_numpy(s).float())
                 m = Categorical(prob)
                 a = m.sample().item()
-                s_prime, r, done, info = env.step(a)
+                s_prime, r, done, truncated, info = env.step(a)
                 model.put_data((s,a,r,s_prime,done))
                 
                 s = s_prime
